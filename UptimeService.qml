@@ -50,7 +50,9 @@ Item {
             url: url,
             method: method,
             period: period,
-            expect: expect
+            expect: expect,
+            headers: String(raw.headers || ""),
+            body: String(raw.body || "")
         };
     }
 
@@ -78,7 +80,7 @@ Item {
             const t = targets[i];
             const live = _runtime[t.key] || null;
             const prev = live || persisted[t.key] || null;
-            const sig = t.method + "|" + t.url + "|" + t.period + "|" + t.expect;
+            const sig = JSON.stringify([t.method, t.url, t.period, t.expect, t.headers, t.body]);
             const unchanged = live && live.sig === sig;
             next[t.key] = {
                 ok: prev ? prev.ok : null,
@@ -132,10 +134,23 @@ Item {
         PluginService.savePluginState(pluginId, "status", out);
     }
 
-    function curlCommand(url, method, timeout) {
+    function parseHeaders(headers) {
+        const out = [];
+        const lines = String(headers || "").split("\n");
+        for (var i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            // A leading "@" makes curl read headers from a file — never from user text.
+            if (line.length > 0 && line[0] !== "@" && line.indexOf(":") > 0)
+                out.push("-H", line);
+        }
+        return out;
+    }
+
+    function curlCommand(url, method, timeout, headers, body) {
         const base = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code} %{time_total}", "-L", "--connect-timeout", "5", "--max-time", String(timeout)];
         const verb = method === "HEAD" ? ["--head"] : ["-X", method];
-        return base.concat(verb).concat([url]);
+        const data = method !== "HEAD" && String(body || "").length > 0 ? ["--data-raw", String(body)] : [];
+        return base.concat(verb).concat(parseHeaders(headers)).concat(data).concat([url]);
     }
 
     function _findTarget(key) {
@@ -157,7 +172,7 @@ Item {
         _publish();
 
         const sig = state.sig;
-        Proc.runCommand(`${pluginId}:check:${key}`, curlCommand(t.url, t.method, timeoutSec), (stdout, exitCode) => {
+        Proc.runCommand(`${pluginId}:check:${key}`, curlCommand(t.url, t.method, timeoutSec, t.headers, t.body), (stdout, exitCode) => {
             _onResult(key, sig, stdout, exitCode);
         }, 0, (timeoutSec + 5) * 1000);
     }

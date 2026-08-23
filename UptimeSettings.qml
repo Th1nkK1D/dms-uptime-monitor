@@ -10,6 +10,52 @@ PluginSettings {
 
     readonly property var methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]
 
+    component MultilineField: Rectangle {
+        id: field
+
+        property alias text: input.text
+        property string placeholderText: ""
+        property int minimumLines: 3
+
+        signal editingFinished
+
+        implicitHeight: Math.max(input.contentHeight, minimumLines * input.font.pixelSize * 1.4) + Theme.spacingS * 2
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
+        border.width: input.activeFocus ? 2 : 1
+        border.color: input.activeFocus ? Theme.primary : Theme.outlineMedium
+
+        TextEdit {
+            id: input
+
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            color: Theme.surfaceText
+            font.family: Theme.monoFontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            selectByMouse: true
+            selectionColor: Theme.primarySelected
+            wrapMode: TextEdit.Wrap
+
+            onActiveFocusChanged: {
+                if (!activeFocus)
+                    field.editingFinished();
+            }
+        }
+
+        StyledText {
+            anchors.left: input.left
+            anchors.top: input.top
+            width: input.width
+            elide: Text.ElideRight
+            text: field.placeholderText
+            font.family: input.font.family
+            font.pixelSize: input.font.pixelSize
+            color: Theme.outlineButton
+            visible: input.text.length === 0
+        }
+    }
+
     Item {
         id: targetsEditor
 
@@ -33,7 +79,9 @@ PluginSettings {
                     url: String(t.url || ""),
                     method: String(t.method || "GET"),
                     period: String(t.period || "60"),
-                    expect: String(t.expect || "200")
+                    expect: String(t.expect || "200"),
+                    headers: String(t.headers || ""),
+                    body: String(t.body || "")
                 });
             }
         }
@@ -53,7 +101,9 @@ PluginSettings {
                     url: t.url,
                     method: t.method,
                     period: t.period,
-                    expect: t.expect
+                    expect: t.expect,
+                    headers: t.headers,
+                    body: t.body
                 });
             }
             return out;
@@ -118,7 +168,11 @@ PluginSettings {
                     required property string method
                     required property string period
                     required property string expect
+                    required property string headers
+                    required property string body
 
+                    property bool advancedOpen: false
+                    readonly property bool hasAdvanced: headers.length > 0 || body.length > 0
                     property string testResult: ""
                     property bool testOk: false
                     property bool testing: false
@@ -146,7 +200,7 @@ PluginSettings {
                         card.testResult = "";
                         const wanted = parseInt(expectField.text) || 200;
                         const timeout = UptimeService.timeoutSec;
-                        Proc.runCommand(`${UptimeService.pluginId}:test:${card.tid}`, UptimeService.curlCommand(target, methodDropdown.currentValue, timeout), (stdout, exitCode) => {
+                        Proc.runCommand(`${UptimeService.pluginId}:test:${card.tid}`, UptimeService.curlCommand(target, methodDropdown.currentValue, timeout, headersField.text, bodyField.text), (stdout, exitCode) => {
                             if (!card || !card.alive)
                                 return;
                             card.testing = false;
@@ -230,12 +284,15 @@ PluginSettings {
                         }
 
                         Row {
+                            id: optionsRow
                             width: parent.width
                             spacing: Theme.spacingS
 
+                            readonly property real fieldWidth: Math.max(64, (width - advancedButton.width - testButton.width - spacing * 4) / 3)
+
                             DankDropdown {
                                 id: methodDropdown
-                                width: 110
+                                width: optionsRow.fieldWidth
                                 dropdownWidth: 110
                                 options: root.methods
                                 currentValue: card.method
@@ -244,7 +301,7 @@ PluginSettings {
 
                             DankTextField {
                                 id: periodField
-                                width: 110
+                                width: optionsRow.fieldWidth
                                 placeholderText: "Period (s)"
                                 text: card.period
                                 validator: IntValidator {
@@ -256,7 +313,7 @@ PluginSettings {
 
                             DankTextField {
                                 id: expectField
-                                width: 110
+                                width: optionsRow.fieldWidth
                                 placeholderText: "Expect"
                                 text: card.expect
                                 validator: IntValidator {
@@ -266,11 +323,56 @@ PluginSettings {
                                 onEditingFinished: targetsEditor.update(card.index, "expect", text)
                             }
 
+                            DankActionButton {
+                                id: advancedButton
+                                anchors.verticalCenter: parent.verticalCenter
+                                iconName: card.advancedOpen ? "expand_less" : "tune"
+                                tooltipText: card.hasAdvanced ? "Headers and body (set)" : "Headers and body"
+                                iconColor: card.hasAdvanced ? Theme.primary : Theme.surfaceText
+                                onClicked: card.advancedOpen = !card.advancedOpen
+                            }
+
                             DankButton {
+                                id: testButton
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: card.testing ? "Testing…" : "Test"
                                 iconName: "play_arrow"
                                 onClicked: card.runTest()
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: Theme.spacingXS
+                            visible: card.advancedOpen
+
+                            StyledText {
+                                text: "Request headers — one \"Name: value\" per line"
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                            }
+
+                            MultilineField {
+                                id: headersField
+                                width: parent.width
+                                placeholderText: "Authorization: Bearer …"
+                                text: card.headers
+                                onEditingFinished: targetsEditor.update(card.index, "headers", text)
+                            }
+
+                            StyledText {
+                                text: "Request body"
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                topPadding: Theme.spacingXS
+                            }
+
+                            MultilineField {
+                                id: bodyField
+                                width: parent.width
+                                placeholderText: "{ \"ping\": true }"
+                                text: card.body
+                                onEditingFinished: targetsEditor.update(card.index, "body", text)
                             }
                         }
 
@@ -296,7 +398,9 @@ PluginSettings {
                         url: "",
                         method: "GET",
                         period: "60",
-                        expect: "200"
+                        expect: "200",
+                        headers: "",
+                        body: ""
                     });
                 }
             }

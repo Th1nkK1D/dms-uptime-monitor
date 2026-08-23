@@ -44,6 +44,15 @@ bar section under **Settings → Dank Bar**.
 **Test** runs the check immediately using the values currently in the card — including unsaved
 ones — and reports `HTTP 200 · 143 ms` or `HTTP 500, expected 200` inline.
 
+The tune button on each card opens optional **request headers** and a **request body**. Headers are
+one `Name: value` per line; lines that are blank or have no colon are ignored. The button turns
+accent-coloured when an endpoint has either set.
+
+Both are sent as typed, with no content type guessed for you — curl defaults to
+`application/x-www-form-urlencoded`, so add `Content-Type: application/json` yourself when posting
+JSON. A body is allowed on any method except HEAD, including GET — the method is always passed
+explicitly, so curl won't silently rewrite a GET-with-body into a POST.
+
 Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
 
 Below the list: **Failing endpoints first** (on by default — lifts failing endpoints to the top of
