@@ -44,8 +44,11 @@ bar section under **Settings → Dank Bar**.
 **Test** runs the check immediately using the values currently in the card — including unsaved
 ones — and reports `HTTP 200 · 143 ms` or `HTTP 500, expected 200` inline.
 
-Two global settings sit below the list: **Notify on recovery** (on by default) and **Request
-timeout** (3–60 s).
+Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
+
+Below the list: **Failing endpoints first** (on by default — lifts failing endpoints to the top of
+the popout, keeping your manual order within each group), **Notify on recovery** (on by default)
+and **Request timeout** (3–60 s).
 
 Click the bar icon for a popout listing every target with its last status code, latency, and how
 long ago it was checked. Each row has a refresh button; the header has one that rechecks

@@ -8,6 +8,15 @@ PluginComponent {
 
     popoutWidth: 420
 
+    readonly property bool failuresFirst: pluginData.failuresFirst ?? true
+
+    readonly property var sortedResults: {
+        const list = UptimeService.results;
+        if (!failuresFirst)
+            return list;
+        return list.filter(r => r.ok === false).concat(list.filter(r => r.ok !== false));
+    }
+
     function statusColor(status) {
         switch (status) {
         case "ok":
@@ -143,7 +152,7 @@ PluginComponent {
                     spacing: Theme.spacingXS
 
                     Repeater {
-                        model: UptimeService.results
+                        model: root.sortedResults
 
                         Rectangle {
                             required property var modelData

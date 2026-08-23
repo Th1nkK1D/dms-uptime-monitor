@@ -63,6 +63,13 @@ PluginSettings {
             root.saveValue("targets", serialize());
         }
 
+        function move(index, delta) {
+            const to = index + delta;
+            if (to < 0 || to >= targetsModel.count)
+                return;
+            targetsModel.move(index, to, 1);
+            commit();
+        }
         function update(index, key, value) {
             if (index < 0 || index >= targetsModel.count)
                 return;
@@ -124,6 +131,10 @@ PluginSettings {
                     radius: Theme.cornerRadius
                     color: Theme.surfaceContainerHigh
 
+                    function commitPendingEdit() {
+                        card.forceActiveFocus();
+                    }
+
                     function runTest() {
                         const target = urlField.text.trim();
                         if (target.length === 0) {
@@ -164,7 +175,7 @@ PluginSettings {
 
                             DankTextField {
                                 id: labelField
-                                width: (parent.width - Theme.spacingS - 32) * 0.32
+                                width: (parent.width - Theme.spacingS * 2 - rowActions.width) * 0.32
                                 placeholderText: "Label"
                                 text: card.label
                                 onEditingFinished: targetsEditor.update(card.index, "label", text)
@@ -172,21 +183,48 @@ PluginSettings {
 
                             DankTextField {
                                 id: urlField
-                                width: parent.width - labelField.width - deleteButton.width - Theme.spacingS * 2
+                                width: parent.width - labelField.width - rowActions.width - Theme.spacingS * 2
                                 placeholderText: "https://example.com/health"
                                 text: card.url
                                 onEditingFinished: targetsEditor.update(card.index, "url", text.trim())
                             }
 
-                            DankActionButton {
-                                id: deleteButton
+                            Row {
+                                id: rowActions
                                 anchors.verticalCenter: parent.verticalCenter
-                                iconName: "delete"
-                                iconColor: Theme.error
-                                tooltipText: "Remove endpoint"
-                                onClicked: {
-                                    targetsModel.remove(card.index);
-                                    targetsEditor.commit();
+                                spacing: Theme.spacingXS
+
+                                DankActionButton {
+                                    iconName: "arrow_upward"
+                                    tooltipText: "Move up"
+                                    enabled: card.index > 0
+                                    opacity: enabled ? 1 : 0.35
+                                    onClicked: {
+                                        card.commitPendingEdit();
+                                        targetsEditor.move(card.index, -1);
+                                    }
+                                }
+
+                                DankActionButton {
+                                    iconName: "arrow_downward"
+                                    tooltipText: "Move down"
+                                    enabled: card.index < targetsModel.count - 1
+                                    opacity: enabled ? 1 : 0.35
+                                    onClicked: {
+                                        card.commitPendingEdit();
+                                        targetsEditor.move(card.index, 1);
+                                    }
+                                }
+
+                                DankActionButton {
+                                    iconName: "delete"
+                                    iconColor: Theme.error
+                                    tooltipText: "Remove endpoint"
+                                    onClicked: {
+                                        card.commitPendingEdit();
+                                        targetsModel.remove(card.index);
+                                        targetsEditor.commit();
+                                    }
                                 }
                             }
                         }
@@ -263,6 +301,13 @@ PluginSettings {
                 }
             }
         }
+    }
+
+    ToggleSetting {
+        settingKey: "failuresFirst"
+        label: "Failing endpoints first"
+        description: "Lift failing endpoints to the top of the popout, keeping the order above within each group"
+        defaultValue: true
     }
 
     ToggleSetting {
