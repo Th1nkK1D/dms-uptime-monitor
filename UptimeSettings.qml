@@ -57,6 +57,67 @@ PluginSettings {
     }
 
     Item {
+        id: intervalSetting
+
+        width: parent.width
+        implicitHeight: intervalRow.implicitHeight
+        height: implicitHeight
+
+        function loadValue() {
+            if (intervalField.activeFocus)
+                return;
+            intervalField.text = String(root.loadValue("period", 60));
+        }
+
+        function commit() {
+            const secs = Math.min(86400, Math.max(5, parseInt(intervalField.text) || 60));
+            intervalField.text = String(secs);
+            root.saveValue("period", secs);
+        }
+
+        Component.onCompleted: loadValue()
+
+        Row {
+            id: intervalRow
+            width: parent.width
+            spacing: Theme.spacingM
+
+            Column {
+                width: parent.width - intervalField.width - Theme.spacingM
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.spacingXS
+
+                StyledText {
+                    text: "Check interval"
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.Medium
+                    color: Theme.surfaceText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: "Seconds between checks, shared by every endpoint (minimum 5)"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+            }
+
+            DankTextField {
+                id: intervalField
+                width: 110
+                anchors.verticalCenter: parent.verticalCenter
+                placeholderText: "60"
+                validator: IntValidator {
+                    bottom: 5
+                    top: 86400
+                }
+                onEditingFinished: intervalSetting.commit()
+            }
+        }
+    }
+
+    Item {
         id: targetsEditor
 
         width: parent.width
@@ -78,7 +139,6 @@ PluginSettings {
                     label: String(t.label || ""),
                     url: String(t.url || ""),
                     method: String(t.method || "GET"),
-                    period: String(t.period || "60"),
                     expect: String(t.expect || "200"),
                     headers: String(t.headers || ""),
                     body: String(t.body || "")
@@ -100,7 +160,6 @@ PluginSettings {
                     label: t.label,
                     url: t.url,
                     method: t.method,
-                    period: t.period,
                     expect: t.expect,
                     headers: t.headers,
                     body: t.body
@@ -149,7 +208,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "Each endpoint is polled on its own interval. A notification fires when the response status differs from the expected one."
+                text: "A notification fires when an endpoint's response status differs from the expected one."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -166,7 +225,6 @@ PluginSettings {
                     required property string label
                     required property string url
                     required property string method
-                    required property string period
                     required property string expect
                     required property string headers
                     required property string body
@@ -288,7 +346,7 @@ PluginSettings {
                             width: parent.width
                             spacing: Theme.spacingS
 
-                            readonly property real fieldWidth: Math.max(64, (width - advancedButton.width - testButton.width - spacing * 4) / 3)
+                            readonly property real fieldWidth: Math.max(64, (width - advancedButton.width - testButton.width - spacing * 3) / 2)
 
                             DankDropdown {
                                 id: methodDropdown
@@ -297,18 +355,6 @@ PluginSettings {
                                 options: root.methods
                                 currentValue: card.method
                                 onValueChanged: value => targetsEditor.update(card.index, "method", value)
-                            }
-
-                            DankTextField {
-                                id: periodField
-                                width: optionsRow.fieldWidth
-                                placeholderText: "Period (s)"
-                                text: card.period
-                                validator: IntValidator {
-                                    bottom: 5
-                                    top: 86400
-                                }
-                                onEditingFinished: targetsEditor.update(card.index, "period", text)
                             }
 
                             DankTextField {
@@ -397,7 +443,6 @@ PluginSettings {
                         label: "",
                         url: "",
                         method: "GET",
-                        period: "60",
                         expect: "200",
                         headers: "",
                         body: ""

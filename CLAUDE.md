@@ -38,8 +38,9 @@ First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime
   (no XMLHttpRequest — matches ecosystem). Exit≠0 / code `000` = DOWN.
 - Notifications: `Quickshell.execDetached(["notify-send","-a","Uptime Monitor","-u","critical",title,body])`.
 - Poller lives in Singleton `UptimeService.qml` (registered in `qmldir`), widgets only read it.
-- Target schema: `{ id, label, url, method:"GET", period:60, expect:200, headers:"", body:"" }`
-  under settings key `targets`. `headers` is newline-separated `Name: value`; both are optional strings.
+- Target schema: `{ id, label, url, method:"GET", expect:200, headers:"", body:"" }` under settings
+  key `targets`. `headers` is newline-separated `Name: value`; headers/body are optional strings.
+- Poll interval is global, not per-target: settings key `period` (seconds, min 5, default 60).
 - Don't *re-declare* injected props (`pluginId`, `pluginService`, `pluginData`) in PluginComponent/PluginSettings.
   But `PluginSettings.pluginId` is `required` and the settings Loader does not set it — you must assign
   `pluginId: UptimeService.pluginId`, or the settings accordion silently loads nothing (height 0).

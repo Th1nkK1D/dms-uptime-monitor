@@ -38,7 +38,6 @@ bar section under **Settings → Dank Bar**.
 | Label      | shown in notifications and the popout | —       |
 | URL        | what to request                       | —       |
 | Method     | GET, HEAD, POST, PUT, DELETE          | GET     |
-| Period (s) | how often to check, minimum 5         | 60      |
 | Expect     | the HTTP status that means healthy    | 200     |
 
 **Test** runs the check immediately using the values currently in the card — including unsaved
@@ -55,12 +54,16 @@ explicitly, so curl won't silently rewrite a GET-with-body into a POST.
 
 Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
 
+Above the list, **Check interval** sets how many seconds pass between checks — one value shared by
+every endpoint, minimum 5.
+
 Below the list: **Failing endpoints first** (on by default — lifts failing endpoints to the top of
 the popout, keeping your manual order within each group), **Notify on recovery** (on by default)
 and **Request timeout** (3–60 s).
 
-Click the bar icon for a popout listing every target with its last status code, latency, and how
-long ago it was checked. Each row has a refresh button; the header has one that rechecks
+Click the bar icon for a popout listing every target with its last status code and latency. The
+header carries the shared cadence and freshness — `every 1m · checked 12s ago` — since all
+endpoints run on one interval. Each row has a refresh button; the header has one that rechecks
 everything.
 
 ## How it works

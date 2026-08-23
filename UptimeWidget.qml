@@ -34,20 +34,33 @@ PluginComponent {
         return ok ? Theme.success : Theme.error;
     }
 
-    function relativeTime(epochMs) {
-        if (!epochMs)
-            return "never";
-        const secs = Math.max(0, Math.round((Date.now() - epochMs) / 1000));
-        if (secs < 5)
-            return "just now";
+    function formatDuration(seconds) {
+        const secs = Math.max(0, Math.round(seconds));
         if (secs < 60)
-            return secs + "s ago";
+            return secs + "s";
         if (secs < 3600)
-            return Math.floor(secs / 60) + "m ago";
-        return Math.floor(secs / 3600) + "h ago";
+            return Math.floor(secs / 60) + "m";
+        return Math.floor(secs / 3600) + "h";
     }
 
-    // Singletons are lazy-loaded in QML; touching UptimeService here starts the poller
+    function elapsedSince(epochMs) {
+        return formatDuration((Date.now() - epochMs) / 1000);
+    }
+
+    function formatInterval(seconds) {
+        const secs = Math.max(0, Math.round(seconds));
+        const parts = [];
+        const hours = Math.floor(secs / 3600);
+        const minutes = Math.floor((secs % 3600) / 60);
+        if (hours > 0)
+            parts.push(hours + "h");
+        if (minutes > 0)
+            parts.push(minutes + "m");
+        if (secs % 60 > 0 || parts.length === 0)
+            parts.push(secs % 60 + "s");
+        return parts.join(" ");
+    }
+
     Component.onCompleted: UptimeService.targets
 
     component StatusIcon: Item {
@@ -119,6 +132,13 @@ PluginComponent {
 
             implicitHeight: layout.implicitHeight
 
+            readonly property double lastCheckedAt: {
+                var newest = 0;
+                for (var i = 0; i < UptimeService.results.length; i++)
+                    newest = Math.max(newest, UptimeService.results[i].lastChecked);
+                return newest;
+            }
+
             Timer {
                 interval: 1000
                 repeat: true
@@ -137,7 +157,15 @@ PluginComponent {
                 headerText: "Uptime Monitor"
                 showCloseButton: true
                 closePopout: popoutRoot.closePopout
-                detailsText: UptimeService.results.length === 0 ? "No targets configured. Add some in Settings → Plugins → Uptime Monitor." : ""
+                detailsText: {
+                    if (UptimeService.results.length === 0)
+                        return "No targets configured. Add some in Settings → Plugins → Uptime Monitor.";
+                    tick.value;
+                    const every = "every " + root.formatInterval(UptimeService.period || 60);
+                    if (!popoutRoot.lastCheckedAt)
+                        return every + " · no checks yet";
+                    return every + " · checked " + root.elapsedSince(popoutRoot.lastCheckedAt) + " ago";
+                }
 
                 headerActions: Component {
                     DankActionButton {
@@ -179,7 +207,7 @@ PluginComponent {
 
                                 Column {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: parent.width - 10 - checkButton.width - Theme.spacingM * 2
+                                    width: parent.width - 10 - Theme.spacingM
                                     spacing: 2
 
                                     StyledText {
@@ -204,29 +232,19 @@ PluginComponent {
                                     StyledText {
                                         width: parent.width
                                         text: {
-                                            tick.value;
                                             if (modelData.checking)
                                                 return "checking…";
                                             if (modelData.ok === null)
                                                 return "pending";
-                                            const when = root.relativeTime(modelData.lastChecked);
                                             if (modelData.ok)
-                                                return "HTTP " + modelData.code + " · " + modelData.timeMs + " ms · " + when;
-                                            return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ") · " + when;
+                                                return "HTTP " + modelData.code + " · " + modelData.timeMs + " ms";
+                                            return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
                                         }
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: modelData.ok === false ? Theme.error : Theme.surfaceVariantText
                                         wrapMode: Text.NoWrap
                                         elide: Text.ElideRight
                                     }
-                                }
-
-                                DankActionButton {
-                                    id: checkButton
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    iconName: "refresh"
-                                    tooltipText: "Check now"
-                                    onClicked: UptimeService.check(modelData.key)
                                 }
                             }
                         }

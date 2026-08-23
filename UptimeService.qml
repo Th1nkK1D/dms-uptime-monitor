@@ -22,6 +22,7 @@ Item {
     property var targets: []
     property bool notifyOnRecovery: defaults.notifyOnRecovery
     property int timeoutSec: defaults.timeoutSec
+    property int period: defaults.period
 
     property var results: []
 
@@ -40,7 +41,6 @@ Item {
     property var _runtime: ({})
 
     function _normalize(raw, index) {
-        const period = Math.max(defaults.minPeriod, parseInt(raw.period) || defaults.period);
         const expect = parseInt(raw.expect) || defaults.expect;
         const method = String(raw.method || defaults.method).toUpperCase();
         const url = String(raw.url || "").trim();
@@ -49,7 +49,6 @@ Item {
             label: String(raw.label || url || "Target " + (index + 1)),
             url: url,
             method: method,
-            period: period,
             expect: expect,
             headers: String(raw.headers || ""),
             body: String(raw.body || "")
@@ -60,6 +59,7 @@ Item {
         const raw = PluginService.loadPluginData(pluginId, "targets", []) || [];
         notifyOnRecovery = PluginService.loadPluginData(pluginId, "notifyOnRecovery", defaults.notifyOnRecovery);
         timeoutSec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "timeoutSec", defaults.timeoutSec)) || defaults.timeoutSec);
+        period = Math.max(defaults.minPeriod, parseInt(PluginService.loadPluginData(pluginId, "period", defaults.period)) || defaults.period);
 
         const normalized = [];
         for (var i = 0; i < raw.length; i++) {
@@ -80,7 +80,7 @@ Item {
             const t = targets[i];
             const live = _runtime[t.key] || null;
             const prev = live || persisted[t.key] || null;
-            const sig = JSON.stringify([t.method, t.url, t.period, t.expect, t.headers, t.body]);
+            const sig = JSON.stringify([t.method, t.url, t.expect, t.headers, t.body]);
             const unchanged = live && live.sig === sig;
             next[t.key] = {
                 ok: prev ? prev.ok : null,
@@ -89,7 +89,7 @@ Item {
                 exitCode: prev ? prev.exitCode : 0,
                 lastChecked: prev ? prev.lastChecked : 0,
                 checking: unchanged ? live.checking : false,
-                nextDue: unchanged ? live.nextDue : now,
+                nextDue: unchanged ? Math.min(live.nextDue, now + period * 1000) : now,
                 sig: sig
             };
         }
@@ -107,7 +107,6 @@ Item {
                 label: t.label,
                 url: t.url,
                 method: t.method,
-                period: t.period,
                 expect: t.expect,
                 ok: s.ok !== undefined ? s.ok : null,
                 code: s.code || "",
@@ -168,7 +167,7 @@ Item {
             return;
 
         state.checking = true;
-        state.nextDue = Date.now() + t.period * 1000;
+        state.nextDue = Date.now() + period * 1000;
         _publish();
 
         const sig = state.sig;
