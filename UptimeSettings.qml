@@ -10,6 +10,91 @@ PluginSettings {
 
     readonly property var methods: ["GET", "HEAD", "POST", "PUT", "DELETE"]
 
+    component NumberSetting: Item {
+        id: numberSetting
+
+        required property string settingKey
+        required property string label
+        property string description: ""
+        property int defaultValue: 0
+        property int minimum: 0
+        property int maximum: 86400
+
+        width: parent.width
+        implicitHeight: settingRow.implicitHeight
+        height: implicitHeight
+
+        function findSettings() {
+            let item = parent;
+            while (item) {
+                if (item.saveValue !== undefined && item.loadValue !== undefined)
+                    return item;
+                item = item.parent;
+            }
+            return null;
+        }
+
+        function loadValue() {
+            // every child reloads whenever any other setting saves
+            if (field.activeFocus)
+                return;
+            const settings = findSettings();
+            if (settings)
+                field.text = String(settings.loadValue(settingKey, defaultValue));
+        }
+
+        function commit() {
+            const parsed = parseInt(field.text);
+            const value = Math.min(maximum, Math.max(minimum, isNaN(parsed) ? defaultValue : parsed));
+            field.text = String(value);
+            const settings = findSettings();
+            if (settings)
+                settings.saveValue(settingKey, value);
+        }
+
+        Component.onCompleted: Qt.callLater(loadValue)
+
+        Row {
+            id: settingRow
+            width: parent.width
+            spacing: Theme.spacingM
+
+            Column {
+                width: parent.width - field.width - Theme.spacingM
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.spacingXS
+
+                StyledText {
+                    text: numberSetting.label
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.weight: Font.Medium
+                    color: Theme.surfaceText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: numberSetting.description
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                    visible: numberSetting.description !== ""
+                }
+            }
+
+            DankTextField {
+                id: field
+                width: 110
+                anchors.verticalCenter: parent.verticalCenter
+                placeholderText: String(numberSetting.defaultValue)
+                validator: IntValidator {
+                    bottom: numberSetting.minimum
+                    top: numberSetting.maximum
+                }
+                onEditingFinished: numberSetting.commit()
+            }
+        }
+    }
+
     component MultilineField: Rectangle {
         id: field
 
@@ -56,65 +141,22 @@ PluginSettings {
         }
     }
 
-    Item {
-        id: intervalSetting
+    NumberSetting {
+        settingKey: "period"
+        label: "Check interval"
+        description: "Seconds between checks, shared by every endpoint (minimum 5)"
+        defaultValue: 60
+        minimum: 5
+        maximum: 86400
+    }
 
-        width: parent.width
-        implicitHeight: intervalRow.implicitHeight
-        height: implicitHeight
-
-        function loadValue() {
-            if (intervalField.activeFocus)
-                return;
-            intervalField.text = String(root.loadValue("period", 60));
-        }
-
-        function commit() {
-            const secs = Math.min(86400, Math.max(5, parseInt(intervalField.text) || 60));
-            intervalField.text = String(secs);
-            root.saveValue("period", secs);
-        }
-
-        Component.onCompleted: loadValue()
-
-        Row {
-            id: intervalRow
-            width: parent.width
-            spacing: Theme.spacingM
-
-            Column {
-                width: parent.width - intervalField.width - Theme.spacingM
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacingXS
-
-                StyledText {
-                    text: "Check interval"
-                    font.pixelSize: Theme.fontSizeLarge
-                    font.weight: Font.Medium
-                    color: Theme.surfaceText
-                }
-
-                StyledText {
-                    width: parent.width
-                    text: "Seconds between checks, shared by every endpoint (minimum 5)"
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceVariantText
-                    wrapMode: Text.WordWrap
-                }
-            }
-
-            DankTextField {
-                id: intervalField
-                width: 110
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "60"
-                validator: IntValidator {
-                    bottom: 5
-                    top: 86400
-                }
-                onEditingFinished: intervalSetting.commit()
-            }
-        }
+    NumberSetting {
+        settingKey: "timeoutSec"
+        label: "Request timeout"
+        description: "Seconds to wait for a response before giving up"
+        defaultValue: 15
+        minimum: 3
+        maximum: 300
     }
 
     Item {
@@ -471,15 +513,5 @@ PluginSettings {
         label: "Notify on recovery"
         description: "Also send a notification when a failing endpoint comes back up"
         defaultValue: true
-    }
-
-    SliderSetting {
-        settingKey: "timeoutSec"
-        label: "Request timeout"
-        description: "Maximum time to wait for a response"
-        defaultValue: 15
-        minimum: 3
-        maximum: 60
-        unit: "s"
     }
 }

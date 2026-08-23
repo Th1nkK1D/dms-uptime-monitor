@@ -54,12 +54,10 @@ explicitly, so curl won't silently rewrite a GET-with-body into a POST.
 
 Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
 
-Above the list, **Check interval** sets how many seconds pass between checks — one value shared by
-every endpoint, minimum 5.
-
-Below the list: **Show URL in popout** (on by default), **Failing endpoints first** (on by default —
-lifts failing endpoints to the top of the popout, keeping your manual order within each group),
-**Notify on recovery** (on by default) and **Request timeout** (3–60 s).
+**Check interval** (seconds between checks, minimum 5) and **Request timeout** (3–300 s) sit above
+the list and apply to every endpoint. Below it: **Show URL in popout** (on by default), **Failing
+endpoints first** (on by default — lifts failing endpoints to the top of the popout, keeping your
+manual order within each group) and **Notify on recovery** (on by default).
 
 Click the bar icon for a popout listing every target with its last status code and latency. The
 header carries the shared cadence and freshness — `every 1m · checked 12s ago` — since all
