@@ -9,6 +9,7 @@ PluginComponent {
     popoutWidth: 420
 
     readonly property bool failuresFirst: pluginData.failuresFirst ?? true
+    readonly property bool showUrl: pluginData.showUrl ?? true
 
     readonly property var sortedResults: {
         const list = UptimeService.results;
@@ -186,18 +187,18 @@ PluginComponent {
                             required property var modelData
 
                             width: parent.width
-                            height: rowContent.implicitHeight + Theme.spacingM * 2
+                            height: infoColumn.implicitHeight + Theme.spacingM * 2
                             radius: Theme.cornerRadius
                             color: Theme.surfaceContainerHigh
 
                             Row {
-                                id: rowContent
                                 anchors.fill: parent
                                 anchors.margins: Theme.spacingM
                                 spacing: Theme.spacingM
 
                                 Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.top: parent.top
+                                    anchors.topMargin: Math.round((labelText.height - height) / 2)
                                     width: 10
                                     height: 10
                                     radius: 5
@@ -206,44 +207,57 @@ PluginComponent {
                                 }
 
                                 Column {
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    id: infoColumn
+                                    anchors.top: parent.top
                                     width: parent.width - 10 - Theme.spacingM
                                     spacing: 2
 
-                                    StyledText {
+                                    Item {
                                         width: parent.width
-                                        text: modelData.label
-                                        font.pixelSize: Theme.fontSizeMedium
-                                        font.weight: Font.Medium
-                                        color: Theme.surfaceText
-                                        wrapMode: Text.NoWrap
-                                        elide: Text.ElideRight
+                                        height: labelText.height
+
+                                        StyledText {
+                                            id: statusText
+                                            anchors.right: parent.right
+                                            anchors.baseline: labelText.baseline
+                                            width: Math.min(implicitWidth, parent.width - Theme.spacingS)
+                                            text: {
+                                                if (modelData.checking)
+                                                    return "checking…";
+                                                if (modelData.ok === null)
+                                                    return "pending";
+                                                if (modelData.ok)
+                                                    return "HTTP " + modelData.code + " · " + modelData.timeMs + " ms";
+                                                return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
+                                            }
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: modelData.ok === false ? Theme.error : Theme.surfaceVariantText
+                                            wrapMode: Text.NoWrap
+                                            elide: Text.ElideRight
+                                        }
+
+                                        StyledText {
+                                            id: labelText
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            width: parent.width - statusText.width - Theme.spacingS
+                                            text: modelData.label
+                                            font.pixelSize: Theme.fontSizeMedium
+                                            font.weight: Font.Medium
+                                            color: Theme.surfaceText
+                                            wrapMode: Text.NoWrap
+                                            elide: Text.ElideRight
+                                        }
                                     }
 
                                     StyledText {
                                         width: parent.width
+                                        visible: root.showUrl
                                         text: modelData.url
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
                                         wrapMode: Text.NoWrap
                                         elide: Text.ElideMiddle
-                                    }
-
-                                    StyledText {
-                                        width: parent.width
-                                        text: {
-                                            if (modelData.checking)
-                                                return "checking…";
-                                            if (modelData.ok === null)
-                                                return "pending";
-                                            if (modelData.ok)
-                                                return "HTTP " + modelData.code + " · " + modelData.timeMs + " ms";
-                                            return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
-                                        }
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        color: modelData.ok === false ? Theme.error : Theme.surfaceVariantText
-                                        wrapMode: Text.NoWrap
-                                        elide: Text.ElideRight
                                     }
                                 }
                             }

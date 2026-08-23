@@ -453,6 +453,13 @@ PluginSettings {
     }
 
     ToggleSetting {
+        settingKey: "showUrl"
+        label: "Show URL in popout"
+        description: "Display each endpoint's URL under its label"
+        defaultValue: true
+    }
+
+    ToggleSetting {
         settingKey: "failuresFirst"
         label: "Failing endpoints first"
         description: "Lift failing endpoints to the top of the popout, keeping the order above within each group"

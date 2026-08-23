@@ -30,6 +30,9 @@ desktop notification on unexpected HTTP status. Full design: `PLAN.md`.
 First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime Monitor" to a bar section.
 
 ## Conventions
+- No arbitrary comments. Only comment what the code cannot say itself: external quirks (curl flags,
+  Qt/DMS behaviour), non-obvious framework contracts, or why a workaround exists. Never restate what
+  the next line already reads as.
 - Format QML with `qmlformat` (default settings, ships with `qt6.qtdeclarative`) — run `./dev.sh fmt`
   before committing. DMS's own source is qmlformat-clean, so defaults keep us identical to upstream style.
   `qmllint` is not used: it can't resolve DMS's `qs.*` imports (Quickshell aliases the shell root as `qs`
