@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Common
+import qs.Services
 import qs.Widgets
 import qs.Modules.Plugins
 
@@ -169,10 +170,27 @@ PluginComponent {
                 }
 
                 headerActions: Component {
-                    DankActionButton {
-                        iconName: "refresh"
-                        tooltipText: "Check all now"
-                        onClicked: UptimeService.checkAll()
+                    Row {
+                        spacing: Theme.spacingXS
+
+                        DankActionButton {
+                            iconName: "settings"
+                            tooltipText: "Open plugin settings"
+                            onClicked: {
+                                if (popoutRoot.closePopout)
+                                    popoutRoot.closePopout();
+                                if (PopoutService.openSettingsWithTab)
+                                    PopoutService.openSettingsWithTab("plugins");
+                                else
+                                    PopoutService.openSettings();
+                            }
+                        }
+
+                        DankActionButton {
+                            iconName: "refresh"
+                            tooltipText: "Check all now"
+                            onClicked: UptimeService.checkAll()
+                        }
                     }
                 }
 
