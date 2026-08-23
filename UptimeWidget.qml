@@ -188,6 +188,7 @@ PluginComponent {
                                         font.pixelSize: Theme.fontSizeMedium
                                         font.weight: Font.Medium
                                         color: Theme.surfaceText
+                                        wrapMode: Text.NoWrap
                                         elide: Text.ElideRight
                                     }
 
@@ -196,6 +197,7 @@ PluginComponent {
                                         text: modelData.url
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: Theme.surfaceVariantText
+                                        wrapMode: Text.NoWrap
                                         elide: Text.ElideMiddle
                                     }
 
@@ -214,6 +216,7 @@ PluginComponent {
                                         }
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: modelData.ok === false ? Theme.error : Theme.surfaceVariantText
+                                        wrapMode: Text.NoWrap
                                         elide: Text.ElideRight
                                     }
                                 }
