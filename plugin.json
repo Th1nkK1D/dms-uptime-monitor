@@ -1,0 +1,15 @@
+{
+  "id": "uptimeMonitor",
+  "name": "Uptime Monitor",
+  "description": "Periodically checks URLs and alerts on unexpected HTTP status",
+  "version": "0.1.0",
+  "author": "Th1nkK1D",
+  "icon": "cell_tower",
+  "type": "widget",
+  "capabilities": ["dankbar-widget"],
+  "component": "./UptimeWidget.qml",
+  "settings": "./UptimeSettings.qml",
+  "requires_dms": ">=1.5.0",
+  "requires": ["curl"],
+  "permissions": ["settings_read", "settings_write", "process", "network"]
+}

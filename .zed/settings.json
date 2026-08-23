@@ -1,0 +1,18 @@
+{
+  "languages": {
+    "QML": {
+      // qmlformat's default indent is 4, as is DMS's own QML source
+      "tab_size": 4,
+      "formatter": {
+        "external": {
+          // qmlformat cannot read stdin, so buffer it through a temp .qml file
+          "command": "sh",
+          "arguments": [
+            "-c",
+            "f=$(mktemp --suffix=.qml); cat > \"$f\"; qmlformat \"$f\"; rm -f \"$f\"",
+          ],
+        },
+      },
+    },
+  },
+}
