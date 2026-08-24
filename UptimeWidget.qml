@@ -134,11 +134,15 @@ PluginComponent {
 
             implicitHeight: layout.implicitHeight
 
+            // Oldest, not newest: the header speaks for every endpoint at once.
             readonly property double lastCheckedAt: {
-                var newest = 0;
-                for (var i = 0; i < UptimeService.results.length; i++)
-                    newest = Math.max(newest, UptimeService.results[i].lastChecked);
-                return newest;
+                var oldest = -1;
+                for (var i = 0; i < UptimeService.results.length; i++) {
+                    const at = UptimeService.results[i].lastChecked;
+                    if (oldest < 0 || at < oldest)
+                        oldest = at;
+                }
+                return Math.max(0, oldest);
             }
 
             Timer {

@@ -40,6 +40,10 @@ Item {
 
     property var _runtime: ({})
 
+    property double nextDue: 0
+
+    property int _runSeq: 0
+
     function _normalize(raw, index) {
         const expect = parseInt(raw.expect) || defaults.expect;
         const method = String(raw.method || defaults.method).toUpperCase();
@@ -89,11 +93,14 @@ Item {
                 exitCode: prev ? prev.exitCode : 0,
                 lastChecked: prev ? prev.lastChecked : 0,
                 checking: unchanged ? live.checking : false,
-                nextDue: unchanged ? Math.min(live.nextDue, now + period * 1000) : now,
+                needsCheck: unchanged ? live.needsCheck === true : true,
+                runId: unchanged ? live.runId : 0,
                 sig: sig
             };
         }
         _runtime = next;
+        if (nextDue > now + period * 1000)
+            nextDue = now + period * 1000;
         _publish();
     }
 
@@ -167,24 +174,36 @@ Item {
             return;
 
         state.checking = true;
-        state.nextDue = Date.now() + period * 1000;
+        state.needsCheck = false;
         _publish();
 
-        const sig = state.sig;
-        Proc.runCommand(`${pluginId}:check:${key}`, curlCommand(t.url, t.method, timeoutSec, t.headers, t.body), (stdout, exitCode) => {
-            _onResult(key, sig, stdout, exitCode);
+        const runId = ++_runSeq;
+        state.runId = runId;
+
+        // No Proc id: reusing one only swaps the stored callback without killing the
+        // running process, so a stale curl would deliver its output to the newest
+        // closure. A null id gets its own entry, which Proc also destroys on completion.
+        Proc.runCommand(null, curlCommand(t.url, t.method, timeoutSec, t.headers, t.body), (stdout, exitCode) => {
+            _onResult(key, runId, stdout, exitCode);
         }, 0, (timeoutSec + 5) * 1000);
     }
 
     function checkAll() {
-        for (var i = 0; i < targets.length; i++)
-            check(targets[i].key);
+        nextDue = Date.now() + period * 1000;
+        for (var i = 0; i < targets.length; i++) {
+            const key = targets[i].key;
+            const state = _runtime[key];
+            if (state && state.checking)
+                state.needsCheck = true;
+            else
+                check(key);
+        }
     }
 
-    function _onResult(key, sig, stdout, exitCode) {
+    function _onResult(key, runId, stdout, exitCode) {
         const t = _findTarget(key);
         const state = _runtime[key];
-        if (!t || !state || state.sig !== sig)
+        if (!t || !state || state.runId !== runId)
             return;
 
         const parts = String(stdout).trim().split(/\s+/);
@@ -227,11 +246,14 @@ Item {
         repeat: true
         running: root.targets.length > 0
         onTriggered: {
-            const now = Date.now();
+            if (Date.now() >= root.nextDue) {
+                root.checkAll();
+                return;
+            }
             for (var i = 0; i < root.targets.length; i++) {
                 const key = root.targets[i].key;
                 const state = root._runtime[key];
-                if (state && !state.checking && now >= state.nextDue)
+                if (state && state.needsCheck && !state.checking)
                     root.check(key);
             }
         }

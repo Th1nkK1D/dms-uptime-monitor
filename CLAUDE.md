@@ -9,7 +9,10 @@ desktop notification on unexpected HTTP status. Full design: `PLAN.md`.
   `$(dirname $(readlink -f $(which dms)))/../share/quickshell/dms/`
   - Plugin base classes: `Modules/Plugins/{PluginComponent,PluginSettings,PopoutComponent,ListSettingWithInput,...}.qml`
   - Theme colors: `Common/Theme.qml` (`Theme.success`, `Theme.error`, `Theme.primary`, `Theme.spacingM`, `Theme.cornerRadius`)
-  - `Common/Proc.qml` → `Proc.runCommand(id, argv, (stdout, exitCode) => {}, debounceMs, timeoutMs)`; same `id` debounces/cancels previous call
+  - `Common/Proc.qml` → `Proc.runCommand(id, argv, (stdout, exitCode) => {}, debounceMs, timeoutMs)`; same `id` debounces calls
+    *before* launch, but does **not** kill an already-running process — it only overwrites the stored callback, so a
+    stale process delivers its output to the newest closure. Pass `null` as `id` for one entry per launch (auto-destroyed
+    on completion). Timeout fires the callback with exit code 124 and kills the process.
   - Widgets: `Widgets/{DankIcon,StyledText,DankTextField,DankButton,DankDropdown,...}.qml`
 - Reference plugins: `~/.config/DankMaterialShell/plugins/dockerManager` (Singleton service + popout),
   `.repos/*/DankBatteryAlerts` (notify-send), `.repos/*/DankGifSearch` (curl via Proc).
