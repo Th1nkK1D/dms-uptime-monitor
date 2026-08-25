@@ -5,14 +5,16 @@ your URLs on a schedule and tells you when one stops answering the way it should
 
 The bar shows a signal-tower icon with a status dot:
 
-| Dot         | Meaning                                   |
-| ----------- | ----------------------------------------- |
-| none        | no targets configured                     |
-| green       | every target returned its expected status |
-| red + count | that many targets are failing             |
+| Dot         | Meaning                                        |
+| ----------- | ---------------------------------------------- |
+| none        | no targets configured                          |
+| green       | every target returned its expected status      |
+| yellow      | a target failed and is being retried           |
+| red + count | that many targets are confirmed down           |
 
-A critical desktop notification fires when a target goes from OK to failing, and an optional
-one when it recovers.
+A failed check does not mean down yet: the target turns yellow and is retried a configured number
+of times first. A critical desktop notification fires only once those retries are exhausted, and an
+optional one when it recovers.
 
 ## Requirements
 
@@ -54,8 +56,9 @@ explicitly, so curl won't silently rewrite a GET-with-body into a POST.
 
 Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
 
-**Check interval** (seconds between checks, minimum 5) and **Request timeout** (3–300 s) sit above
-the list and apply to every endpoint. Below it: **Show URL in popout** (on by default), **Failing
+**Check interval** (seconds between checks, minimum 5), **Request timeout** (3–300 s), **Retries
+before down** (extra attempts after a failed check, 0 disables retrying) and **Retry delay**
+(seconds between those retries) sit above the list and apply to every endpoint. Below it: **Show URL in popout** (on by default), **Failing
 endpoints first** (on by default — lifts failing endpoints to the top of the popout, keeping your
 manual order within each group) and **Notify on recovery** (on by default).
 
@@ -68,6 +71,11 @@ endpoints run on one interval. The header's refresh button rechecks everything.
 Checks run through `curl -s -o /dev/null -w '%{http_code} %{time_total}'`, so nothing but the
 status line is downloaded (`HEAD` uses `--head`). A non-zero curl exit or a `000` status is
 treated as unreachable, and exit 124 as a timeout.
+
+A failing target enters the warning state and is rechecked every **Retry delay** seconds, off the
+shared poll cycle, until it either answers as expected — back to green, no notification — or uses
+up its retries and is declared down. While it is down it is no longer retried out of band; the
+normal poll cycle picks it back up.
 
 The poller lives in a QML singleton (`UptimeService.qml`) rather than in the widget, so it runs
 once no matter how many monitors show the bar. Results persist to

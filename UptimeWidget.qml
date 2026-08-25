@@ -16,13 +16,15 @@ PluginComponent {
         const list = UptimeService.results;
         if (!failuresFirst)
             return list;
-        return list.filter(r => r.ok === false).concat(list.filter(r => r.ok !== false));
+        return list.filter(r => r.ok === false).concat(list.filter(r => r.ok !== false && r.warning)).concat(list.filter(r => r.ok !== false && !r.warning));
     }
 
     function statusColor(status) {
         switch (status) {
         case "ok":
             return Theme.success;
+        case "warn":
+            return Theme.warning;
         case "fail":
             return Theme.error;
         default:
@@ -30,10 +32,14 @@ PluginComponent {
         }
     }
 
-    function dotColor(ok) {
-        if (ok === null || ok === undefined)
+    function dotColor(result) {
+        if (result.ok === false)
+            return Theme.error;
+        if (result.warning)
+            return Theme.warning;
+        if (result.ok === null || result.ok === undefined)
             return Theme.outlineButton;
-        return ok ? Theme.success : Theme.error;
+        return Theme.success;
     }
 
     function formatDuration(seconds) {
@@ -73,7 +79,7 @@ PluginComponent {
             anchors.centerIn: parent
             name: "cell_tower"
             size: root.iconSize
-            color: UptimeService.status === "fail" ? Theme.error : Theme.surfaceText
+            color: UptimeService.status === "fail" ? Theme.error : (UptimeService.status === "warn" ? Theme.warning : Theme.surfaceText)
         }
 
         Rectangle {
@@ -224,7 +230,7 @@ PluginComponent {
                                     width: 10
                                     height: 10
                                     radius: 5
-                                    color: root.dotColor(modelData.ok)
+                                    color: root.dotColor(modelData)
                                     opacity: modelData.checking ? 0.4 : 1
                                 }
 
@@ -246,6 +252,8 @@ PluginComponent {
                                             text: {
                                                 if (modelData.checking)
                                                     return "checking…";
+                                                if (modelData.warning)
+                                                    return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " · retrying (" + modelData.retriesLeft + " left)";
                                                 if (modelData.ok === null)
                                                     return "pending";
                                                 if (modelData.ok)
@@ -253,7 +261,7 @@ PluginComponent {
                                                 return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
                                             }
                                             font.pixelSize: Theme.fontSizeSmall
-                                            color: modelData.ok === false ? Theme.error : Theme.surfaceVariantText
+                                            color: modelData.ok === false ? Theme.error : (modelData.warning ? Theme.warning : Theme.surfaceVariantText)
                                             wrapMode: Text.NoWrap
                                             elide: Text.ElideRight
                                         }

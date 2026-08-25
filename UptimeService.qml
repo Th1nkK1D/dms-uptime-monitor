@@ -16,27 +16,32 @@ Item {
             method: "GET",
             timeoutSec: 15,
             notifyOnRecovery: true,
-            minPeriod: 5
+            minPeriod: 5,
+            retryCount: 2,
+            retryDelaySec: 10
         })
 
     property var targets: []
     property bool notifyOnRecovery: defaults.notifyOnRecovery
     property int timeoutSec: defaults.timeoutSec
     property int period: defaults.period
+    property int retryCount: defaults.retryCount
+    property int retryDelaySec: defaults.retryDelaySec
 
     property var results: []
 
     readonly property string status: {
         if (results.length === 0)
             return "empty";
-        for (var i = 0; i < results.length; i++) {
-            if (results[i].ok === false)
-                return "fail";
-        }
+        if (failCount > 0)
+            return "fail";
+        if (warnCount > 0)
+            return "warn";
         return "ok";
     }
 
     readonly property int failCount: results.filter(r => r.ok === false).length
+    readonly property int warnCount: results.filter(r => r.ok !== false && r.warning).length
 
     property var _runtime: ({})
 
@@ -64,6 +69,8 @@ Item {
         notifyOnRecovery = PluginService.loadPluginData(pluginId, "notifyOnRecovery", defaults.notifyOnRecovery);
         timeoutSec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "timeoutSec", defaults.timeoutSec)) || defaults.timeoutSec);
         period = Math.max(defaults.minPeriod, parseInt(PluginService.loadPluginData(pluginId, "period", defaults.period)) || defaults.period);
+        retryCount = Math.max(0, parseInt(PluginService.loadPluginData(pluginId, "retryCount", defaults.retryCount)) || 0);
+        retryDelaySec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "retryDelaySec", defaults.retryDelaySec)) || defaults.retryDelaySec);
 
         const normalized = [];
         for (var i = 0; i < raw.length; i++) {
@@ -86,12 +93,16 @@ Item {
             const prev = live || persisted[t.key] || null;
             const sig = JSON.stringify([t.method, t.url, t.expect, t.headers, t.body]);
             const unchanged = live && live.sig === sig;
+            const reconfigured = live && live.sig !== sig;
             next[t.key] = {
                 ok: prev ? prev.ok : null,
                 code: prev ? prev.code : "",
                 timeMs: prev ? prev.timeMs : 0,
                 exitCode: prev ? prev.exitCode : 0,
                 lastChecked: prev ? prev.lastChecked : 0,
+                attempt: prev && prev.attempt && !reconfigured ? prev.attempt : 0,
+                warning: prev ? prev.warning === true && !reconfigured : false,
+                retryDue: unchanged && live.retryDue ? live.retryDue : 0,
                 checking: unchanged ? live.checking : false,
                 needsCheck: unchanged ? live.needsCheck === true : true,
                 runId: unchanged ? live.runId : 0,
@@ -120,6 +131,9 @@ Item {
                 timeMs: s.timeMs || 0,
                 exitCode: s.exitCode || 0,
                 lastChecked: s.lastChecked || 0,
+                warning: s.warning === true,
+                attempt: s.attempt || 0,
+                retriesLeft: Math.max(0, retryCount - (s.attempt || 0) + 1),
                 checking: s.checking === true
             });
         }
@@ -134,7 +148,9 @@ Item {
                 code: _runtime[key].code,
                 timeMs: _runtime[key].timeMs,
                 exitCode: _runtime[key].exitCode,
-                lastChecked: _runtime[key].lastChecked
+                lastChecked: _runtime[key].lastChecked,
+                attempt: _runtime[key].attempt,
+                warning: _runtime[key].warning
             };
         }
         PluginService.savePluginState(pluginId, "status", out);
@@ -175,6 +191,7 @@ Item {
 
         state.checking = true;
         state.needsCheck = false;
+        state.retryDue = 0;
         _publish();
 
         const runId = ++_runSeq;
@@ -212,14 +229,24 @@ Item {
         const ok = exitCode === 0 && parseInt(code) === t.expect;
         const wasOk = state.ok;
 
-        state.ok = ok;
         state.code = code;
         state.timeMs = timeMs;
         state.exitCode = exitCode;
         state.lastChecked = Date.now();
         state.checking = false;
+
+        const retrying = !ok && state.ok !== false && state.attempt < retryCount;
+        state.attempt = ok ? 0 : state.attempt + 1;
+        state.warning = retrying;
+        state.retryDue = retrying ? state.lastChecked + retryDelaySec * 1000 : 0;
+        if (ok || !retrying)
+            state.ok = ok;
+
         _publish();
         _persist();
+
+        if (retrying)
+            return;
 
         if (!ok && wasOk !== false)
             _notify(t, code, exitCode, false);
@@ -250,10 +277,13 @@ Item {
                 root.checkAll();
                 return;
             }
+            const now = Date.now();
             for (var i = 0; i < root.targets.length; i++) {
                 const key = root.targets[i].key;
                 const state = root._runtime[key];
-                if (state && state.needsCheck && !state.checking)
+                if (!state || state.checking)
+                    continue;
+                if (state.needsCheck || (state.retryDue > 0 && now >= state.retryDue))
                     root.check(key);
             }
         }

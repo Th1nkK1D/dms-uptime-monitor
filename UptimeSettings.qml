@@ -159,6 +159,24 @@ PluginSettings {
         maximum: 300
     }
 
+    NumberSetting {
+        settingKey: "retryCount"
+        label: "Retries before down"
+        description: "Extra attempts after a failed check before the endpoint is declared down and notified (0 disables retrying)"
+        defaultValue: 2
+        minimum: 0
+        maximum: 10
+    }
+
+    NumberSetting {
+        settingKey: "retryDelaySec"
+        label: "Retry delay"
+        description: "Seconds to wait between retries while an endpoint is in the warning state"
+        defaultValue: 10
+        minimum: 1
+        maximum: 3600
+    }
+
     Item {
         id: targetsEditor
 
@@ -250,7 +268,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "A notification fires when an endpoint's response status differs from the expected one."
+                text: "An endpoint whose response status differs from the expected one turns yellow and is retried; a notification fires once the retries are exhausted."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
