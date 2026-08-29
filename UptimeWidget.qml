@@ -27,12 +27,16 @@ PluginComponent {
             return Theme.warning;
         case "fail":
             return Theme.error;
+        case "offline":
+            return Theme.outlineButton;
         default:
             return "transparent";
         }
     }
 
     function dotColor(result) {
+        if (UptimeService.offline)
+            return Theme.outlineButton;
         if (result.ok === false)
             return Theme.error;
         if (result.warning)
@@ -79,7 +83,7 @@ PluginComponent {
             anchors.centerIn: parent
             name: "cell_tower"
             size: root.iconSize
-            color: UptimeService.status === "fail" ? Theme.error : (UptimeService.status === "warn" ? Theme.warning : Theme.surfaceText)
+            color: UptimeService.status === "fail" ? Theme.error : (UptimeService.status === "warn" ? Theme.warning : (UptimeService.status === "offline" ? Theme.surfaceVariantText : Theme.surfaceText))
         }
 
         Rectangle {
@@ -106,7 +110,7 @@ PluginComponent {
 
         StyledText {
             anchors.verticalCenter: parent.verticalCenter
-            visible: UptimeService.failCount > 0
+            visible: UptimeService.failCount > 0 && !UptimeService.offline
             text: String(UptimeService.failCount)
             font.pixelSize: Theme.fontSizeSmall
             font.weight: Font.Normal
@@ -123,7 +127,7 @@ PluginComponent {
 
         StyledText {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: UptimeService.failCount > 0
+            visible: UptimeService.failCount > 0 && !UptimeService.offline
             text: String(UptimeService.failCount)
             font.pixelSize: Theme.fontSizeSmall
             font.weight: Font.Normal
@@ -173,6 +177,10 @@ PluginComponent {
                     if (UptimeService.results.length === 0)
                         return "No targets configured. Add some in Settings → Plugins → Uptime Monitor.";
                     tick.value;
+                    if (UptimeService.linkDown)
+                        return "No network connection — checks are paused.";
+                    if (UptimeService.uplinkSuspect)
+                        return "Every endpoint is unreachable — likely a connection problem.";
                     const every = "every " + root.formatInterval(UptimeService.period || 60);
                     if (!popoutRoot.lastCheckedAt)
                         return every + " · no checks yet";
@@ -198,7 +206,7 @@ PluginComponent {
 
                         DankActionButton {
                             iconName: "refresh"
-                            tooltipText: "Check all now"
+                            tooltipText: UptimeService.linkDown ? "Check all now (no network)" : "Check all now"
                             onClicked: UptimeService.checkAll()
                         }
                     }
@@ -261,7 +269,7 @@ PluginComponent {
                                                 return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
                                             }
                                             font.pixelSize: Theme.fontSizeSmall
-                                            color: modelData.ok === false ? Theme.error : (modelData.warning ? Theme.warning : Theme.surfaceVariantText)
+                                            color: UptimeService.offline ? Theme.surfaceVariantText : (modelData.ok === false ? Theme.error : (modelData.warning ? Theme.warning : Theme.surfaceVariantText))
                                             wrapMode: Text.NoWrap
                                             elide: Text.ElideRight
                                         }

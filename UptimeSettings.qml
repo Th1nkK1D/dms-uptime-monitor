@@ -177,6 +177,15 @@ PluginSettings {
         maximum: 3600
     }
 
+    NumberSetting {
+        settingKey: "settleSec"
+        label: "Reconnect grace period"
+        description: "Seconds to wait before checking again after the network comes back or the machine wakes from suspend (0 disables the delay)"
+        defaultValue: 10
+        minimum: 0
+        maximum: 600
+    }
+
     Item {
         id: targetsEditor
 

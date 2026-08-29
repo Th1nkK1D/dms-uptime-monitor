@@ -18,7 +18,8 @@ Item {
             notifyOnRecovery: true,
             minPeriod: 5,
             retryCount: 2,
-            retryDelaySec: 10
+            retryDelaySec: 10,
+            settleSec: 10
         })
 
     property var targets: []
@@ -27,12 +28,35 @@ Item {
     property int period: defaults.period
     property int retryCount: defaults.retryCount
     property int retryDelaySec: defaults.retryDelaySec
+    property int settleSec: defaults.settleSec
 
     property var results: []
+
+    readonly property bool linkDown: NetworkService.networkStatus === "disconnected"
+
+    // Every endpoint failing to *reach* its host at once says more about our uplink than
+    // about the endpoints, but one endpoint can't tell the two apart. Final verdicts only:
+    // counting retrying endpoints would flicker this on a single blip.
+    readonly property bool uplinkSuspect: {
+        if (results.length < 2)
+            return false;
+        for (var i = 0; i < results.length; i++) {
+            const r = results[i];
+            if (r.ok !== false)
+                return false;
+            if (!isConnectivityFailure(r.code, r.exitCode))
+                return false;
+        }
+        return true;
+    }
+
+    readonly property bool offline: linkDown || uplinkSuspect
 
     readonly property string status: {
         if (results.length === 0)
             return "empty";
+        if (offline)
+            return "offline";
         if (failCount > 0)
             return "fail";
         if (warnCount > 0)
@@ -48,6 +72,10 @@ Item {
     property double nextDue: 0
 
     property int _runSeq: 0
+
+    property bool _uplinkNotified: false
+
+    property double _pendingSince: 0
 
     function _normalize(raw, index) {
         const expect = parseInt(raw.expect) || defaults.expect;
@@ -71,6 +99,9 @@ Item {
         period = Math.max(defaults.minPeriod, parseInt(PluginService.loadPluginData(pluginId, "period", defaults.period)) || defaults.period);
         retryCount = Math.max(0, parseInt(PluginService.loadPluginData(pluginId, "retryCount", defaults.retryCount)) || 0);
         retryDelaySec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "retryDelaySec", defaults.retryDelaySec)) || defaults.retryDelaySec);
+        const settle = parseInt(PluginService.loadPluginData(pluginId, "settleSec", defaults.settleSec));
+        settleSec = isNaN(settle) ? defaults.settleSec : Math.max(0, settle);
+        _uplinkNotified = PluginService.loadPluginState(pluginId, "uplinkNotified", false) === true;
 
         const normalized = [];
         for (var i = 0; i < raw.length; i++) {
@@ -102,6 +133,7 @@ Item {
                 lastChecked: prev ? prev.lastChecked : 0,
                 attempt: prev && prev.attempt && !reconfigured ? prev.attempt : 0,
                 warning: prev ? prev.warning === true && !reconfigured : false,
+                notifiedOk: prev && prev.notifiedOk !== undefined ? prev.notifiedOk : (prev ? prev.ok : null),
                 retryDue: unchanged && live.retryDue ? live.retryDue : 0,
                 checking: unchanged ? live.checking : false,
                 needsCheck: unchanged ? live.needsCheck === true : true,
@@ -150,7 +182,8 @@ Item {
                 exitCode: _runtime[key].exitCode,
                 lastChecked: _runtime[key].lastChecked,
                 attempt: _runtime[key].attempt,
-                warning: _runtime[key].warning
+                warning: _runtime[key].warning,
+                notifiedOk: _runtime[key].notifiedOk
             };
         }
         PluginService.savePluginState(pluginId, "status", out);
@@ -217,23 +250,40 @@ Item {
         }
     }
 
+    // A check that was in flight across a link drop or a suspend measured the outage,
+    // not the endpoint. Bumping runId makes _onResult discard the late callback.
+    function _clearPending() {
+        for (var key in _runtime) {
+            const state = _runtime[key];
+            if (state.checking)
+                state.runId = ++_runSeq;
+            state.checking = false;
+            state.attempt = 0;
+            state.retryDue = 0;
+            state.warning = false;
+            state.needsCheck = false;
+        }
+        _pendingSince = 0;
+        _publish();
+    }
+
     function _onResult(key, runId, stdout, exitCode) {
         const t = _findTarget(key);
         const state = _runtime[key];
         if (!t || !state || state.runId !== runId)
             return;
 
+        state.checking = false;
+
         const parts = String(stdout).trim().split(/\s+/);
         const code = parts[0] || "000";
         const timeMs = Math.round((parseFloat(parts[1]) || 0) * 1000);
         const ok = exitCode === 0 && parseInt(code) === t.expect;
-        const wasOk = state.ok;
 
         state.code = code;
         state.timeMs = timeMs;
         state.exitCode = exitCode;
         state.lastChecked = Date.now();
-        state.checking = false;
 
         const retrying = !ok && state.ok !== false && state.attempt < retryCount;
         state.attempt = ok ? 0 : state.attempt + 1;
@@ -244,19 +294,100 @@ Item {
 
         _publish();
         _persist();
+        _flushNotifications();
+    }
 
-        if (retrying)
+    function _settled() {
+        for (var i = 0; i < targets.length; i++) {
+            const s = _runtime[targets[i].key];
+            if (!s)
+                continue;
+            if (s.checking || s.needsCheck || s.retryDue > 0 || s.lastChecked === 0)
+                return false;
+        }
+        return true;
+    }
+
+    function _hasPending() {
+        for (var i = 0; i < targets.length; i++) {
+            const s = _runtime[targets[i].key];
+            if (s && s.ok !== null && s.ok !== s.notifiedOk)
+                return true;
+        }
+        return false;
+    }
+
+    // Held until the cycle settles, so a whole-uplink outage is recognised before it can
+    // fire one notification per endpoint. Capped, because an endpoint slower than the
+    // poll interval never settles and must not sit on everyone else's alerts.
+    function _flushNotifications() {
+        if (linkDown || targets.length === 0)
             return;
 
-        if (!ok && wasOk !== false)
-            _notify(t, code, exitCode, false);
-        else if (ok && wasOk === false && notifyOnRecovery)
-            _notify(t, code, exitCode, true);
+        if (!_hasPending() && _uplinkNotified === uplinkSuspect) {
+            _pendingSince = 0;
+            return;
+        }
+
+        const now = Date.now();
+        if (_pendingSince === 0)
+            _pendingSince = now;
+        if (!_settled() && now - _pendingSince < (timeoutSec + 5) * 1000)
+            return;
+        _pendingSince = 0;
+
+        if (uplinkSuspect) {
+            if (!_uplinkNotified) {
+                _uplinkNotified = true;
+                PluginService.savePluginState(pluginId, "uplinkNotified", true);
+                _notifyNetwork(false);
+            }
+            return;
+        }
+
+        if (_uplinkNotified) {
+            _uplinkNotified = false;
+            PluginService.savePluginState(pluginId, "uplinkNotified", false);
+            if (notifyOnRecovery)
+                _notifyNetwork(true);
+        }
+
+        var changed = false;
+        for (var i = 0; i < targets.length; i++) {
+            const t = targets[i];
+            const state = _runtime[t.key];
+            if (!state || state.ok === null || state.ok === state.notifiedOk)
+                continue;
+            if (state.ok === false)
+                _notify(t, state.code, state.exitCode, false);
+            else if (state.notifiedOk === false && notifyOnRecovery)
+                _notify(t, state.code, state.exitCode, true);
+            state.notifiedOk = state.ok;
+            changed = true;
+        }
+        if (changed)
+            _persist();
+    }
+
+    function isConnectivityFailure(code, exitCode) {
+        // 124 is Proc's timeout killing curl, not a curl exit code.
+        return exitCode === 6 || exitCode === 7 || exitCode === 28 || exitCode === 124 || code === "000";
     }
 
     function describeFailure(code, exitCode) {
-        if (exitCode === 124)
+        switch (exitCode) {
+        case 6:
+            return "DNS lookup failed";
+        case 7:
+            return "could not connect";
+        case 28:
+        case 124:
             return "timed out";
+        case 35:
+            return "TLS handshake failed";
+        case 60:
+            return "certificate not trusted";
+        }
         if (exitCode !== 0 || code === "000")
             return "unreachable (curl exit " + exitCode + ")";
         return "HTTP " + code;
@@ -268,16 +399,42 @@ Item {
         Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
     }
 
+    function _notifyNetwork(recovered) {
+        const title = recovered ? "Network is back" : "Network appears to be down";
+        const body = recovered ? "Resuming per-endpoint alerts." : "All " + targets.length + " endpoints are unreachable — per-endpoint alerts are paused.";
+        Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
+    }
+
+    onLinkDownChanged: {
+        _clearPending();
+        if (!linkDown)
+            nextDue = Date.now() + settleSec * 1000;
+    }
+
     Timer {
         interval: 1000
         repeat: true
-        running: root.targets.length > 0
+        running: root.targets.length > 0 && !root.linkDown
+
+        property double lastTick: 0
+
         onTriggered: {
-            if (Date.now() >= root.nextDue) {
+            const now = Date.now();
+            const gap = lastTick > 0 ? now - lastTick : 0;
+            lastTick = now;
+
+            // A 1s timer that jumped means the machine was suspended: the link is up on
+            // paper but wifi is still reassociating, so give it the same grace as a reconnect.
+            if (gap > 15000) {
+                root._clearPending();
+                root.nextDue = now + root.settleSec * 1000;
+                return;
+            }
+
+            if (now >= root.nextDue) {
                 root.checkAll();
                 return;
             }
-            const now = Date.now();
             for (var i = 0; i < root.targets.length; i++) {
                 const key = root.targets[i].key;
                 const state = root._runtime[key];
@@ -286,6 +443,7 @@ Item {
                 if (state.needsCheck || (state.retryDue > 0 && now >= state.retryDue))
                     root.check(key);
             }
+            root._flushNotifications();
         }
     }
 
