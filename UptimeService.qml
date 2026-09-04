@@ -73,8 +73,6 @@ Item {
 
     property int _runSeq: 0
 
-    property bool _uplinkNotified: false
-
     property double _pendingSince: 0
 
     function _normalize(raw, index) {
@@ -101,7 +99,6 @@ Item {
         retryDelaySec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "retryDelaySec", defaults.retryDelaySec)) || defaults.retryDelaySec);
         const settle = parseInt(PluginService.loadPluginData(pluginId, "settleSec", defaults.settleSec));
         settleSec = isNaN(settle) ? defaults.settleSec : Math.max(0, settle);
-        _uplinkNotified = PluginService.loadPluginState(pluginId, "uplinkNotified", false) === true;
 
         const normalized = [];
         for (var i = 0; i < raw.length; i++) {
@@ -308,6 +305,28 @@ Item {
         return true;
     }
 
+    // uplinkSuspect for a cycle that hasn't settled yet: every endpoint that has a verdict
+    // failed to reach its host, and the ones still checking may well do the same.
+    function _uplinkPlausible() {
+        if (targets.length < 2)
+            return false;
+        var unsettled = 0;
+        var fails = 0;
+        for (var i = 0; i < targets.length; i++) {
+            const s = _runtime[targets[i].key];
+            if (!s)
+                continue;
+            if (s.checking || s.needsCheck || s.retryDue > 0 || s.lastChecked === 0) {
+                unsettled++;
+                continue;
+            }
+            if (s.ok !== false || !isConnectivityFailure(s.code, s.exitCode))
+                return false;
+            fails++;
+        }
+        return unsettled > 0 && fails > 0;
+    }
+
     function _hasPending() {
         for (var i = 0; i < targets.length; i++) {
             const s = _runtime[targets[i].key];
@@ -319,12 +338,14 @@ Item {
 
     // Held until the cycle settles, so a whole-uplink outage is recognised before it can
     // fire one notification per endpoint. Capped, because an endpoint slower than the
-    // poll interval never settles and must not sit on everyone else's alerts.
+    // poll interval must not sit on everyone else's alerts — but the cap is waived while
+    // the cycle still looks like an outage, or it would release the very alerts the wait
+    // exists to suppress. Every check ends within its timeout, so that wait is bounded.
     function _flushNotifications() {
         if (linkDown || targets.length === 0)
             return;
 
-        if (!_hasPending() && _uplinkNotified === uplinkSuspect) {
+        if (!_hasPending()) {
             _pendingSince = 0;
             return;
         }
@@ -332,25 +353,12 @@ Item {
         const now = Date.now();
         if (_pendingSince === 0)
             _pendingSince = now;
-        if (!_settled() && now - _pendingSince < (timeoutSec + 5) * 1000)
+        if (!_settled() && (now - _pendingSince < (timeoutSec + 5) * 1000 || _uplinkPlausible()))
             return;
         _pendingSince = 0;
 
-        if (uplinkSuspect) {
-            if (!_uplinkNotified) {
-                _uplinkNotified = true;
-                PluginService.savePluginState(pluginId, "uplinkNotified", true);
-                _notifyNetwork(false);
-            }
+        if (uplinkSuspect)
             return;
-        }
-
-        if (_uplinkNotified) {
-            _uplinkNotified = false;
-            PluginService.savePluginState(pluginId, "uplinkNotified", false);
-            if (notifyOnRecovery)
-                _notifyNetwork(true);
-        }
 
         var changed = false;
         for (var i = 0; i < targets.length; i++) {
@@ -396,12 +404,6 @@ Item {
     function _notify(t, code, exitCode, recovered) {
         const title = recovered ? (t.label + " is back up") : (t.label + " is down");
         const body = recovered ? (t.url + " — HTTP " + code) : (t.url + " — " + describeFailure(code, exitCode) + ", expected " + t.expect);
-        Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
-    }
-
-    function _notifyNetwork(recovered) {
-        const title = recovered ? "Network is back" : "Network appears to be down";
-        const body = recovered ? "Resuming per-endpoint alerts." : "All " + targets.length + " endpoints are unreachable — per-endpoint alerts are paused.";
         Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
     }
 
