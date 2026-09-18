@@ -4,9 +4,10 @@ DankMaterialShell (DMS) bar plugin: polls user-defined URLs, shows a signal-towe
 with a status dot (none = no targets, green = all OK, red = some failing), sends a
 desktop notification on unexpected HTTP status. Full design: `PLAN.md`.
 
-## Environment facts (NixOS, DMS 1.5.3)
-- DMS QML source (read-only, canonical API reference):
-  `$(dirname $(readlink -f $(which dms)))/../share/quickshell/dms/`
+## Environment facts (NixOS, DMS 1.6.1)
+- DMS QML source (read-only, canonical API reference): no longer in the Nix store; the running
+  `dms` unpacks it to `/run/user/$UID/danklinux-shell/<hash>/` (only exists while DMS runs).
+  Many `Widgets/*` and `Common/Proc.qml` are thin wrappers; the real code is under `DankCommon/`.
   - Plugin base classes: `Modules/Plugins/{PluginComponent,PluginSettings,PopoutComponent,ListSettingWithInput,...}.qml`
   - Theme colors: `Common/Theme.qml` (`Theme.success`, `Theme.error`, `Theme.primary`, `Theme.spacingM`, `Theme.cornerRadius`)
   - `Common/Proc.qml` → `Proc.runCommand(id, argv, (stdout, exitCode) => {}, debounceMs, timeoutMs)`; same `id` debounces calls
