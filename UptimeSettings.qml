@@ -248,6 +248,12 @@ PluginSettings {
             targetsModel.move(index, to, 1);
             commit();
         }
+
+        function remove(index) {
+            targetsModel.remove(index);
+            commit();
+        }
+
         function update(index, key, value) {
             if (index < 0 || index >= targetsModel.count)
                 return;
@@ -403,8 +409,7 @@ PluginSettings {
                                     tooltipText: "Remove endpoint"
                                     onClicked: {
                                         card.commitPendingEdit();
-                                        targetsModel.remove(card.index);
-                                        targetsEditor.commit();
+                                        targetsEditor.remove(card.index);
                                     }
                                 }
                             }
