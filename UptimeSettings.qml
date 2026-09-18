@@ -141,51 +141,6 @@ PluginSettings {
         }
     }
 
-    NumberSetting {
-        settingKey: "period"
-        label: "Check interval"
-        description: "Seconds between checks, shared by every endpoint (minimum 5)"
-        defaultValue: 60
-        minimum: 5
-        maximum: 86400
-    }
-
-    NumberSetting {
-        settingKey: "timeoutSec"
-        label: "Request timeout"
-        description: "Seconds to wait for a response before giving up"
-        defaultValue: 15
-        minimum: 3
-        maximum: 300
-    }
-
-    NumberSetting {
-        settingKey: "retryCount"
-        label: "Retries before down"
-        description: "Extra attempts after a failed check before the endpoint is declared down and notified (0 disables retrying)"
-        defaultValue: 2
-        minimum: 0
-        maximum: 10
-    }
-
-    NumberSetting {
-        settingKey: "retryDelaySec"
-        label: "Retry delay"
-        description: "Seconds to wait between retries while an endpoint is in the warning state"
-        defaultValue: 10
-        minimum: 1
-        maximum: 3600
-    }
-
-    NumberSetting {
-        settingKey: "settleSec"
-        label: "Reconnect grace period"
-        description: "Seconds to wait before checking again after the network comes back or the machine wakes from suspend (0 disables the delay)"
-        defaultValue: 10
-        minimum: 0
-        maximum: 600
-    }
-
     Item {
         id: targetsEditor
 
@@ -283,7 +238,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "An endpoint whose response status differs from the expected one turns yellow and is retried; a notification fires once the retries are exhausted."
+                text: "An endpoint whose response status code differs from the expected one turns yellow and is retried; a notification fires once the retries are exhausted."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -509,6 +464,7 @@ PluginSettings {
             }
 
             DankButton {
+                anchors.horizontalCenter: parent.horizontalCenter
                 text: "Add endpoint"
                 iconName: "add"
                 onClicked: {
@@ -524,6 +480,51 @@ PluginSettings {
                 }
             }
         }
+    }
+
+    NumberSetting {
+        settingKey: "period"
+        label: "Check interval"
+        description: "Seconds between checks, shared by every endpoint (minimum 5)"
+        defaultValue: 60
+        minimum: 5
+        maximum: 86400
+    }
+
+    NumberSetting {
+        settingKey: "timeoutSec"
+        label: "Request timeout"
+        description: "Seconds to wait for a response before giving up"
+        defaultValue: 15
+        minimum: 3
+        maximum: 300
+    }
+
+    NumberSetting {
+        settingKey: "retryCount"
+        label: "Retries before down"
+        description: "Extra attempts after a failed check before the endpoint is declared down and notified (0 disables retrying)"
+        defaultValue: 2
+        minimum: 0
+        maximum: 10
+    }
+
+    NumberSetting {
+        settingKey: "retryDelaySec"
+        label: "Retry delay"
+        description: "Seconds to wait between retries while an endpoint is in the warning state"
+        defaultValue: 10
+        minimum: 1
+        maximum: 3600
+    }
+
+    NumberSetting {
+        settingKey: "settleSec"
+        label: "Reconnect grace period"
+        description: "Seconds to wait before checking again after the network comes back or the machine wakes from suspend (0 disables the delay)"
+        defaultValue: 10
+        minimum: 0
+        maximum: 600
     }
 
     ToggleSetting {
