@@ -199,10 +199,11 @@ Item {
     }
 
     function curlCommand(url, method, timeout, headers, body) {
-        const base = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code} %{time_total}", "-L", "--connect-timeout", "5", "--max-time", String(timeout)];
+        const base = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code} %{time_total}", "--connect-timeout", "5", "--max-time", String(timeout)];
         const verb = method === "HEAD" ? ["--head"] : ["-X", method];
         const data = method !== "HEAD" && String(body || "").length > 0 ? ["--data-raw", String(body)] : [];
-        return base.concat(verb).concat(parseHeaders(headers)).concat(data).concat([url]);
+        // --url so a URL starting with "-" can't be parsed as a curl option.
+        return base.concat(verb).concat(parseHeaders(headers)).concat(data).concat(["--url", url]);
     }
 
     function _findTarget(key) {
@@ -236,6 +237,8 @@ Item {
     }
 
     function checkAll() {
+        if (linkDown)
+            return;
         nextDue = Date.now() + period * 1000;
         for (var i = 0; i < targets.length; i++) {
             const key = targets[i].key;

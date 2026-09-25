@@ -2,7 +2,7 @@
 
 DankMaterialShell (DMS) bar plugin: polls user-defined URLs, shows a signal-tower icon
 with a status dot (none = no targets, green = all OK, red = some failing), sends a
-desktop notification on unexpected HTTP status. Full design: `PLAN.md`.
+desktop notification on unexpected HTTP status.
 
 ## Environment facts (NixOS, DMS 1.6.1)
 - DMS QML source (read-only, canonical API reference): no longer in the Nix store; the running
@@ -18,7 +18,7 @@ desktop notification on unexpected HTTP status. Full design: `PLAN.md`.
 - Reference plugins: `~/.config/DankMaterialShell/plugins/dockerManager` (Singleton service + popout),
   `.repos/*/DankBatteryAlerts` (notify-send), `.repos/*/DankGifSearch` (curl via Proc).
 - Plugin settings are stored in `~/.config/DankMaterialShell/plugin_settings.json[pluginId]`;
-  runtime state in `~/.config/DankMaterialShell/<pluginId>_state.json`.
+  runtime state in `~/.local/state/DankMaterialShell/plugins/<pluginId>_state.json`.
 - DMS runs as `systemctl --user dms.service`; logs: `journalctl --user -fu dms`.
 
 ## Dev commands
@@ -41,7 +41,8 @@ First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime
   before committing. DMS's own source is qmlformat-clean, so defaults keep us identical to upstream style.
   `qmllint` is not used: it can't resolve DMS's `qs.*` imports (Quickshell aliases the shell root as `qs`
   at runtime), so every DMS singleton shows up as a false "unqualified access".
-- HTTP via `curl -s -o /dev/null -w '%{http_code}' -X METHOD --connect-timeout 5 --max-time 15 URL`
+- HTTP via `curl -s -o /dev/null -w '%{http_code}' -X METHOD --connect-timeout 5 --max-time 15 --url URL`
+  (no `-L`: expecting a 3xx must be possible; `--url` so a leading `-` isn't read as an option)
   (no XMLHttpRequest — matches ecosystem). Exit≠0 / code `000` = DOWN.
 - Notifications: `Quickshell.execDetached(["notify-send","-a","Uptime Monitor","-u","critical",title,body])`.
 - Poller lives in Singleton `UptimeService.qml` (registered in `qmldir`), widgets only read it.
@@ -51,3 +52,5 @@ First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime
 - Don't *re-declare* injected props (`pluginId`, `pluginService`, `pluginData`) in PluginComponent/PluginSettings.
   But `PluginSettings.pluginId` is `required` and the settings Loader does not set it — you must assign
   `pluginId: UptimeService.pluginId`, or the settings accordion silently loads nothing (height 0).
+- Commits: a single conventional-commit subject line (`fix:`, `feat:`, `docs:`), no body. Name the concrete
+  changes, not a vague summary — e.g. `fix: allow expecting 3xx, block offline refresh, keep new endpoint cards`.

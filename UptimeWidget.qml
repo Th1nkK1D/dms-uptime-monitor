@@ -206,7 +206,9 @@ PluginComponent {
 
                         DankActionButton {
                             iconName: "refresh"
-                            tooltipText: UptimeService.linkDown ? "Check all now (no network)" : "Check all now"
+                            tooltipText: "Check all now"
+                            enabled: !UptimeService.linkDown
+                            opacity: enabled ? 1 : 0.35
                             onClicked: UptimeService.checkAll()
                         }
                     }

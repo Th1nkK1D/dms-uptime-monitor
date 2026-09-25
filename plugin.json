@@ -10,6 +10,6 @@
   "component": "./UptimeWidget.qml",
   "settings": "./UptimeSettings.qml",
   "requires_dms": ">=1.5.0",
-  "requires": ["curl"],
+  "requires": ["curl", "notify-send"],
   "permissions": ["settings_read", "settings_write", "process", "network"]
 }

@@ -11,6 +11,7 @@ The bar shows a signal-tower icon with a status dot:
 | green       | every target returned its expected status      |
 | yellow      | a target failed and is being retried           |
 | red + count | that many targets are confirmed down           |
+| grey        | offline — no network, or every target unreachable at once |
 
 A failed check does not mean down yet: the target turns yellow and is retried a configured number
 of times first. A critical desktop notification fires only once those retries are exhausted, and an
@@ -20,6 +21,7 @@ optional one when it recovers.
 
 - DankMaterialShell >= 1.5.0
 - `curl`
+- `notify-send` (libnotify)
 
 ## Install
 
@@ -57,10 +59,12 @@ explicitly, so curl won't silently rewrite a GET-with-body into a POST.
 Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
 
 **Check interval** (seconds between checks, minimum 5), **Request timeout** (3–300 s), **Retries
-before down** (extra attempts after a failed check, 0 disables retrying) and **Retry delay**
-(seconds between those retries) sit above the list and apply to every endpoint. Below it: **Show URL in popout** (on by default), **Failing
-endpoints first** (on by default — lifts failing endpoints to the top of the popout, keeping your
-manual order within each group) and **Notify on recovery** (on by default).
+before down** (extra attempts after a failed check, 0 disables retrying), **Retry delay** (seconds
+between those retries) and **Reconnect grace period** (seconds to wait after the network returns or
+the machine wakes, before checking again) sit below the list and apply to every endpoint. Then:
+**Show URL in popout** (off by default), **Failing endpoints first** (on by default — lifts failing
+endpoints to the top of the popout, keeping your manual order within each group) and **Notify on
+recovery** (on by default).
 
 Click the bar icon for a popout listing every target with its last status code and latency. The
 header carries the shared cadence and freshness — `every 1m · checked 12s ago` — since all
@@ -69,8 +73,11 @@ endpoints run on one interval. The header's refresh button rechecks everything.
 ## How it works
 
 Checks run through `curl -s -o /dev/null -w '%{http_code} %{time_total}'`, so nothing but the
-status line is downloaded (`HEAD` uses `--head`). A non-zero curl exit or a `000` status is
-treated as unreachable, and exit 124 as a timeout.
+status line is downloaded (`HEAD` uses `--head`). Redirects are not followed, so a `301`/`302`
+is reported as-is — set **Expect** to it, or point the URL at the final location. A non-zero curl
+exit or a `000` status is treated as unreachable, and exit 124 as a timeout.
+
+While the network is down, checks and the refresh button are paused.
 
 A failing target enters the warning state and is rechecked every **Retry delay** seconds, off the
 shared poll cycle, until it either answers as expected — back to green, no notification — or uses
@@ -97,7 +104,7 @@ avoids re-notifying you about a target that was already down.
 Editing `UptimeService.qml` needs a full `systemctl --user restart dms` — QML caches singletons
 per engine, so `plugins reload` only picks up widget and settings changes.
 
-See `CLAUDE.md` for API notes and `PLAN.md` for the design.
+See `AGENTS.md` for API notes.
 
 ## License
 

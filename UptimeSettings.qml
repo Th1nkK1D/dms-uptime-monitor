@@ -477,6 +477,7 @@ PluginSettings {
                         headers: "",
                         body: ""
                     });
+                    targetsEditor.commit();
                 }
             }
         }
