@@ -45,8 +45,10 @@ First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime
   (no `-L`: expecting a 3xx must be possible; `--url` so a leading `-` isn't read as an option)
   (no XMLHttpRequest — matches ecosystem). Exit≠0 / code `000` = DOWN.
 - Notifications: `Quickshell.execDetached(["notify-send","-a","Uptime Monitor","-u","critical",title,body])`.
-- Poller lives in Singleton `UptimeService.qml` (registered in `qmldir`), widgets only read it.
-- Target schema: `{ id, label, url, method:"GET", expect:"2xx", headers:"", body:"" }` under settings
+- Poller lives in Singleton `UptimeService.qml` (registered in `qmldir`); widgets read it and call its
+  actions (`checkAll`, `check`, `setPaused`). `results` is active endpoints only (drives the bar and
+  offline detection); `displayResults` adds paused ones, in settings order, for the popout.
+- Target schema: `{ id, label, url, method:"GET", expect:"2xx", headers:"", body:"", paused:false }` under settings
   key `targets`. `expect` is comma-separated codes or `x`-wildcard classes (`"200, 2xx"`), normalized by
   `UptimeService.normalizeExpect`. `headers` is newline-separated `Name: value`; headers/body are optional strings.
 - Poll interval is global, not per-target: settings key `period` (seconds, min 5, default 60).

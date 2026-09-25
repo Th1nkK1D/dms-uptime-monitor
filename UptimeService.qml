@@ -24,6 +24,7 @@ Item {
         })
 
     property var targets: []
+    property var _allTargets: []
     property bool notifyOnRecovery: defaults.notifyOnRecovery
     property int timeoutSec: defaults.timeoutSec
     property int period: defaults.period
@@ -32,6 +33,7 @@ Item {
     property int settleSec: defaults.settleSec
 
     property var results: []
+    property var displayResults: []
 
     readonly property bool linkDown: NetworkService.networkStatus === "disconnected"
 
@@ -87,7 +89,8 @@ Item {
             method: method,
             expect: expect,
             headers: String(raw.headers || ""),
-            body: String(raw.body || "")
+            body: String(raw.body || ""),
+            paused: raw.paused === true
         };
     }
 
@@ -107,8 +110,17 @@ Item {
             if (t.url.length > 0)
                 normalized.push(t);
         }
-        targets = normalized;
+        _allTargets = normalized;
+        targets = normalized.filter(t => !t.paused);
         _syncRuntime();
+    }
+
+    function setPaused(key, paused) {
+        const raw = PluginService.loadPluginData(pluginId, "targets", []) || [];
+        const next = raw.map((r, i) => _normalize(r, i).key === key ? Object.assign({}, r, {
+                paused: paused
+            }) : r);
+        PluginService.savePluginData(pluginId, "targets", next);
     }
 
     function _syncRuntime() {
@@ -129,6 +141,7 @@ Item {
                 timeMs: prev ? prev.timeMs : 0,
                 exitCode: prev ? prev.exitCode : 0,
                 lastChecked: prev ? prev.lastChecked : 0,
+                failingSince: prev && prev.failingSince ? prev.failingSince : 0,
                 attempt: prev && prev.attempt ? prev.attempt : 0,
                 warning: prev ? prev.warning === true : false,
                 notifiedOk: prev && prev.notifiedOk !== undefined ? prev.notifiedOk : (prev ? prev.ok : null),
@@ -143,14 +156,16 @@ Item {
         if (nextDue > now + period * 1000)
             nextDue = now + period * 1000;
         _publish();
+        _persist();
     }
 
     function _publish() {
         const list = [];
-        for (var i = 0; i < targets.length; i++) {
-            const t = targets[i];
-            const s = _runtime[t.key] || {};
+        for (var i = 0; i < _allTargets.length; i++) {
+            const t = _allTargets[i];
+            const s = t.paused ? {} : (_runtime[t.key] || {});
             list.push({
+                paused: t.paused,
                 key: t.key,
                 label: t.label,
                 url: t.url,
@@ -161,13 +176,15 @@ Item {
                 timeMs: s.timeMs || 0,
                 exitCode: s.exitCode || 0,
                 lastChecked: s.lastChecked || 0,
+                failingSince: s.failingSince || 0,
                 warning: s.warning === true,
                 attempt: s.attempt || 0,
                 retriesLeft: Math.max(0, retryCount - (s.attempt || 0) + 1),
                 checking: s.checking === true
             });
         }
-        results = list;
+        displayResults = list;
+        results = list.filter(r => !r.paused);
     }
 
     function _persist() {
@@ -179,6 +196,7 @@ Item {
                 timeMs: _runtime[key].timeMs,
                 exitCode: _runtime[key].exitCode,
                 lastChecked: _runtime[key].lastChecked,
+                failingSince: _runtime[key].failingSince,
                 attempt: _runtime[key].attempt,
                 warning: _runtime[key].warning,
                 notifiedOk: _runtime[key].notifiedOk,
@@ -237,7 +255,7 @@ Item {
     function check(key) {
         const t = _findTarget(key);
         const state = _runtime[key];
-        if (!t || !state || state.checking)
+        if (linkDown || !t || !state || state.checking)
             return;
 
         state.checking = true;
@@ -282,6 +300,8 @@ Item {
             state.retryDue = 0;
             state.warning = false;
             state.needsCheck = false;
+            if (state.ok !== false)
+                state.failingSince = 0;
         }
         _pendingSince = 0;
         _publish();
@@ -302,6 +322,8 @@ Item {
         state.timeMs = result.timeMs;
         state.exitCode = exitCode;
         state.lastChecked = Date.now();
+        state.downtimeMs = ok && state.failingSince ? state.lastChecked - state.failingSince : 0;
+        state.failingSince = ok ? 0 : (state.failingSince || state.lastChecked);
 
         const retrying = !ok && state.ok !== false && state.attempt < retryCount;
         state.attempt = ok ? 0 : state.attempt + 1;
@@ -388,9 +410,9 @@ Item {
             if (!state || state.ok === null || state.ok === state.notifiedOk)
                 continue;
             if (state.ok === false)
-                _notify(t, state.code, state.exitCode, false);
+                _notify(t, state, false);
             else if (state.notifiedOk === false && notifyOnRecovery)
-                _notify(t, state.code, state.exitCode, true);
+                _notify(t, state, true);
             state.notifiedOk = state.ok;
             changed = true;
         }
@@ -408,23 +430,33 @@ Item {
         case 6:
             return "DNS lookup failed";
         case 7:
-            return "could not connect";
+            return "Could not connect";
         case 28:
         case 124:
-            return "timed out";
+            return "Timed out";
         case 35:
             return "TLS handshake failed";
         case 60:
-            return "certificate not trusted";
+            return "Certificate not trusted";
         }
         if (exitCode !== 0 || code === "000")
-            return "unreachable (curl exit " + exitCode + ")";
+            return "Unreachable (curl exit " + exitCode + ")";
         return "HTTP " + code;
     }
 
-    function _notify(t, code, exitCode, recovered) {
+    function formatDuration(ms) {
+        const secs = Math.max(0, Math.round(ms / 1000));
+        if (secs < 60)
+            return secs + "s";
+        if (secs < 3600)
+            return Math.floor(secs / 60) + "m";
+        return Math.floor(secs / 3600) + "h";
+    }
+
+    function _notify(t, state, recovered) {
         const title = recovered ? (t.label + " is back up") : (t.label + " is down");
-        const body = recovered ? (t.url + " — HTTP " + code) : (t.url + " — " + describeFailure(code, exitCode) + ", expected " + t.expect);
+        const downFor = state.downtimeMs > 0 ? " after " + formatDuration(state.downtimeMs) + " down" : "";
+        const body = recovered ? (t.url + " — HTTP " + state.code + downFor) : (t.url + " — " + describeFailure(state.code, state.exitCode) + ", expected " + t.expect);
         Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
     }
 

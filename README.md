@@ -15,7 +15,7 @@ The bar shows a signal-tower icon with a status dot:
 
 A failed check does not mean down yet: the target turns yellow and is retried a configured number
 of times first. A critical desktop notification fires only once those retries are exhausted, and an
-optional one when it recovers.
+optional one when it recovers, saying how long it was down.
 
 ## Requirements
 
@@ -59,19 +59,23 @@ Both are sent as typed, with no content type guessed for you — curl defaults t
 JSON. A body is allowed on any method except HEAD, including GET — the method is always passed
 explicitly, so curl won't silently rewrite a GET-with-body into a POST.
 
-Each card also has up/down arrows to set the order endpoints appear in, and a delete button.
+Each card also has a pause button (a paused endpoint is not checked, stays in the popout greyed
+out — last, when failing endpoints are lifted first — and starts fresh when resumed), up/down arrows
+to set the order endpoints appear in, and a delete button.
 
 **Check interval** (seconds between checks, minimum 5), **Request timeout** (3–300 s), **Retries
 before down** (extra attempts after a failed check, 0 disables retrying), **Retry delay** (seconds
 between those retries) and **Reconnect grace period** (seconds to wait after the network returns or
 the machine wakes, before checking again) sit below the list and apply to every endpoint. Then:
-**Show URL in popout** (off by default), **Failing endpoints first** (on by default — lifts failing
-endpoints to the top of the popout, keeping your manual order within each group) and **Notify on
-recovery** (on by default).
+**Failing endpoints first** (on by default — lifts failing endpoints to the top of the popout,
+keeping your manual order within each group) and **Notify on recovery** (on by default).
 
-Click the bar icon for a popout listing every target with its last status code and latency. The
-header carries the shared cadence and freshness — `every 1m · checked 12s ago` — since all
-endpoints run on one interval. The header's refresh button rechecks everything.
+Click the bar icon for a popout listing every target with its last status code and latency — or,
+for a failing one, how long it has been down (`Down 12m · HTTP 503`). The header carries the shared
+cadence and freshness — `every 1m · checked 12s ago` — since all endpoints run on one interval. The
+header's refresh button rechecks everything. Click a row to expand it: it shows the URL, method and
+expected status, with **Pause** / **Resume**, **Open** (the URL in your browser) and **Check now**
+(just that endpoint).
 
 ## How it works
 

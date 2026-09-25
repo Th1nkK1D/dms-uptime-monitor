@@ -10,13 +10,13 @@ PluginComponent {
     popoutWidth: 420
 
     readonly property bool failuresFirst: pluginData.failuresFirst ?? true
-    readonly property bool showUrl: pluginData.showUrl ?? false
 
     readonly property var sortedResults: {
-        const list = UptimeService.results;
+        const list = UptimeService.displayResults;
         if (!failuresFirst)
             return list;
-        return list.filter(r => r.ok === false).concat(list.filter(r => r.ok !== false && r.warning)).concat(list.filter(r => r.ok !== false && !r.warning));
+        const active = list.filter(r => !r.paused);
+        return active.filter(r => r.ok === false).concat(active.filter(r => r.ok !== false && r.warning)).concat(active.filter(r => r.ok !== false && !r.warning)).concat(list.filter(r => r.paused));
     }
 
     function statusColor(status) {
@@ -35,7 +35,7 @@ PluginComponent {
     }
 
     function dotColor(result) {
-        if (UptimeService.offline)
+        if (result.paused || UptimeService.offline)
             return Theme.outlineButton;
         if (result.ok === false)
             return Theme.error;
@@ -46,17 +46,8 @@ PluginComponent {
         return Theme.success;
     }
 
-    function formatDuration(seconds) {
-        const secs = Math.max(0, Math.round(seconds));
-        if (secs < 60)
-            return secs + "s";
-        if (secs < 3600)
-            return Math.floor(secs / 60) + "m";
-        return Math.floor(secs / 3600) + "h";
-    }
-
     function elapsedSince(epochMs) {
-        return formatDuration((Date.now() - epochMs) / 1000);
+        return UptimeService.formatDuration(Date.now() - epochMs);
     }
 
     function formatInterval(seconds) {
@@ -137,6 +128,7 @@ PluginComponent {
 
             property var closePopout: null
             property var parentPopout: null
+            property string expandedKey: ""
 
             implicitHeight: layout.implicitHeight
 
@@ -170,8 +162,10 @@ PluginComponent {
                 showCloseButton: true
                 closePopout: popoutRoot.closePopout
                 detailsText: {
+                    if (UptimeService.displayResults.length === 0)
+                        return "Nothing to monitor yet. Use the settings button above to add a URL and the status code it should answer with.";
                     if (UptimeService.results.length === 0)
-                        return "No targets configured. Add some in Settings → Plugins → Uptime Monitor.";
+                        return "Nothing is being checked";
                     tick.value;
                     if (UptimeService.linkDown)
                         return "No network connection — checks are paused.";
@@ -218,36 +212,52 @@ PluginComponent {
                         model: root.sortedResults
 
                         Rectangle {
+                            id: endpointRow
+
                             required property var modelData
+                            readonly property bool expanded: popoutRoot.expandedKey === modelData.key
 
                             width: parent.width
-                            height: infoColumn.implicitHeight + Theme.spacingM * 2
+                            height: rowContent.implicitHeight + Theme.spacingM * 2
                             radius: Theme.cornerRadius
-                            color: Theme.surfaceContainerHigh
+                            color: rowHover.hovered ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
 
-                            Row {
+                            HoverHandler {
+                                id: rowHover
+                            }
+
+                            MouseArea {
                                 anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: popoutRoot.expandedKey = endpointRow.expanded ? "" : endpointRow.modelData.key
+                            }
+
+                            Column {
+                                id: rowContent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
                                 anchors.margins: Theme.spacingM
-                                spacing: Theme.spacingM
+                                spacing: Theme.spacingS
 
-                                Rectangle {
-                                    anchors.top: parent.top
-                                    anchors.topMargin: Math.round((labelText.height - height) / 2)
-                                    width: 10
-                                    height: 10
-                                    radius: 5
-                                    color: root.dotColor(modelData)
-                                    opacity: modelData.checking ? 0.4 : 1
-                                }
+                                Row {
+                                    width: parent.width
+                                    spacing: Theme.spacingM
+                                    opacity: modelData.paused ? 0.5 : 1
 
-                                Column {
-                                    id: infoColumn
-                                    anchors.top: parent.top
-                                    width: parent.width - 10 - Theme.spacingM
-                                    spacing: 2
+                                    Rectangle {
+                                        anchors.top: parent.top
+                                        anchors.topMargin: Math.round((labelText.height - height) / 2)
+                                        width: 10
+                                        height: 10
+                                        radius: 5
+                                        color: root.dotColor(modelData)
+                                        opacity: modelData.checking ? 0.4 : 1
+                                    }
 
                                     Item {
-                                        width: parent.width
+                                        anchors.top: parent.top
+                                        width: parent.width - 10 - chevron.width - Theme.spacingM * 2
                                         height: labelText.height
 
                                         StyledText {
@@ -256,15 +266,19 @@ PluginComponent {
                                             anchors.baseline: labelText.baseline
                                             width: Math.min(implicitWidth, parent.width - Theme.spacingS)
                                             text: {
+                                                if (modelData.paused)
+                                                    return "Paused";
                                                 if (modelData.checking)
-                                                    return "checking…";
+                                                    return "Checking…";
                                                 if (modelData.warning)
                                                     return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " · retrying (" + modelData.retriesLeft + " left)";
                                                 if (modelData.ok === null)
-                                                    return "pending";
+                                                    return "Pending";
                                                 if (modelData.ok)
                                                     return "HTTP " + modelData.code + " · " + modelData.timeMs + " ms";
-                                                return UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
+                                                tick.value;
+                                                const downFor = modelData.failingSince > 0 ? "Down " + root.elapsedSince(modelData.failingSince) + " · " : "";
+                                                return downFor + UptimeService.describeFailure(modelData.code, modelData.exitCode) + " (expected " + modelData.expect + ")";
                                             }
                                             font.pixelSize: Theme.fontSizeSmall
                                             color: UptimeService.offline ? Theme.surfaceVariantText : (modelData.ok === false ? Theme.error : (modelData.warning ? Theme.warning : Theme.surfaceVariantText))
@@ -286,14 +300,80 @@ PluginComponent {
                                         }
                                     }
 
-                                    StyledText {
-                                        width: parent.width
-                                        visible: root.showUrl
-                                        text: modelData.url
-                                        font.pixelSize: Theme.fontSizeSmall
+                                    DankIcon {
+                                        id: chevron
+                                        anchors.top: parent.top
+                                        anchors.topMargin: Math.round((labelText.height - height) / 2)
+                                        name: endpointRow.expanded ? "expand_less" : "expand_more"
+                                        size: 18
                                         color: Theme.surfaceVariantText
-                                        wrapMode: Text.NoWrap
-                                        elide: Text.ElideMiddle
+                                    }
+                                }
+
+                                Item {
+                                    width: parent.width
+                                    height: endpointRow.expanded ? details.implicitHeight : 0
+                                    visible: height > 0
+                                    clip: true
+
+                                    Behavior on height {
+                                        NumberAnimation {
+                                            duration: Theme.shortDuration
+                                            easing.type: Theme.standardEasing
+                                        }
+                                    }
+
+                                    Column {
+                                        id: details
+                                        width: parent.width
+                                        leftPadding: 10 + Theme.spacingM
+                                        spacing: Theme.spacingS
+
+                                        StyledText {
+                                            width: parent.width - parent.leftPadding
+                                            text: modelData.url
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                            wrapMode: Text.WrapAnywhere
+                                        }
+
+                                        StyledText {
+                                            text: modelData.method + " · expects " + modelData.expect
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                        }
+
+                                        Row {
+                                            spacing: Theme.spacingS
+
+                                            DankButton {
+                                                buttonHeight: 32
+                                                text: modelData.paused ? "Resume" : "Pause"
+                                                iconName: modelData.paused ? "play_arrow" : "pause"
+                                                onClicked: UptimeService.setPaused(modelData.key, !modelData.paused)
+                                            }
+
+                                            DankButton {
+                                                buttonHeight: 32
+                                                text: "Open"
+                                                iconName: "open_in_new"
+                                                onClicked: {
+                                                    Qt.openUrlExternally(modelData.url);
+                                                    if (popoutRoot.closePopout)
+                                                        popoutRoot.closePopout();
+                                                }
+                                            }
+
+                                            DankButton {
+                                                buttonHeight: 32
+                                                visible: !modelData.paused
+                                                text: "Check now"
+                                                iconName: "refresh"
+                                                enabled: !UptimeService.linkDown && !modelData.checking
+                                                opacity: enabled ? 1 : 0.35
+                                                onClicked: UptimeService.check(modelData.key)
+                                            }
+                                        }
                                     }
                                 }
                             }

@@ -165,7 +165,8 @@ PluginSettings {
                     method: String(t.method || UptimeService.defaults.method),
                     expect: String(t.expect || UptimeService.defaults.expect),
                     headers: String(t.headers || ""),
-                    body: String(t.body || "")
+                    body: String(t.body || ""),
+                    paused: t.paused === true
                 });
             }
         }
@@ -186,7 +187,8 @@ PluginSettings {
                     method: t.method,
                     expect: t.expect,
                     headers: t.headers,
-                    body: t.body
+                    body: t.body,
+                    paused: t.paused
                 });
             }
             return out;
@@ -258,6 +260,7 @@ PluginSettings {
                     required property string expect
                     required property string headers
                     required property string body
+                    required property bool paused
 
                     property bool advancedOpen: false
                     readonly property bool hasAdvanced: headers.length > 0 || body.length > 0
@@ -314,6 +317,7 @@ PluginSettings {
                                 id: labelField
                                 width: (parent.width - Theme.spacingS * 2 - rowActions.width) * 0.32
                                 placeholderText: "Label"
+                                opacity: card.paused ? 0.5 : 1
                                 text: card.label
                                 onEditingFinished: targetsEditor.update(card.index, "label", text)
                             }
@@ -322,6 +326,7 @@ PluginSettings {
                                 id: urlField
                                 width: parent.width - labelField.width - rowActions.width - Theme.spacingS * 2
                                 placeholderText: "https://example.com/health"
+                                opacity: card.paused ? 0.5 : 1
                                 text: card.url
                                 onEditingFinished: targetsEditor.update(card.index, "url", text.trim())
                             }
@@ -330,6 +335,16 @@ PluginSettings {
                                 id: rowActions
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: Theme.spacingXS
+
+                                DankActionButton {
+                                    iconName: card.paused ? "play_arrow" : "pause"
+                                    iconColor: card.paused ? Theme.primary : Theme.surfaceText
+                                    tooltipText: card.paused ? "Resume checks" : "Pause checks"
+                                    onClicked: {
+                                        card.commitPendingEdit();
+                                        targetsEditor.update(card.index, "paused", !card.paused);
+                                    }
+                                }
 
                                 DankActionButton {
                                     iconName: "arrow_upward"
@@ -369,6 +384,7 @@ PluginSettings {
                             id: optionsRow
                             width: parent.width
                             spacing: Theme.spacingS
+                            opacity: card.paused ? 0.5 : 1
 
                             readonly property real fieldWidth: Math.max(64, (width - advancedButton.width - testButton.width - spacing * 3) / 2)
 
@@ -479,7 +495,8 @@ PluginSettings {
                         method: UptimeService.defaults.method,
                         expect: UptimeService.defaults.expect,
                         headers: "",
-                        body: ""
+                        body: "",
+                        paused: false
                     });
                     targetsEditor.commit();
                 }
@@ -530,13 +547,6 @@ PluginSettings {
         defaultValue: UptimeService.defaults.settleSec
         minimum: 0
         maximum: 600
-    }
-
-    ToggleSetting {
-        settingKey: "showUrl"
-        label: "Show URL in popout"
-        description: "Display each endpoint's URL under its label"
-        defaultValue: false
     }
 
     ToggleSetting {
