@@ -531,7 +531,7 @@ PluginSettings {
         settingKey: "showUrl"
         label: "Show URL in popout"
         description: "Display each endpoint's URL under its label"
-        defaultValue: true
+        defaultValue: false
     }
 
     ToggleSetting {

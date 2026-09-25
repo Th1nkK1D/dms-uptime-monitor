@@ -10,7 +10,7 @@ PluginComponent {
     popoutWidth: 420
 
     readonly property bool failuresFirst: pluginData.failuresFirst ?? true
-    readonly property bool showUrl: pluginData.showUrl ?? true
+    readonly property bool showUrl: pluginData.showUrl ?? false
 
     readonly property var sortedResults: {
         const list = UptimeService.results;
