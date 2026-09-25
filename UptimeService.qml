@@ -119,18 +119,18 @@ Item {
         for (var i = 0; i < targets.length; i++) {
             const t = targets[i];
             const live = _runtime[t.key] || null;
-            const prev = live || persisted[t.key] || null;
             const sig = JSON.stringify([t.method, t.url, t.expect, t.headers, t.body]);
+            const stored = live || persisted[t.key] || null;
+            const prev = stored && (stored.sig === undefined || stored.sig === sig) ? stored : null;
             const unchanged = live && live.sig === sig;
-            const reconfigured = live && live.sig !== sig;
             next[t.key] = {
                 ok: prev ? prev.ok : null,
                 code: prev ? prev.code : "",
                 timeMs: prev ? prev.timeMs : 0,
                 exitCode: prev ? prev.exitCode : 0,
                 lastChecked: prev ? prev.lastChecked : 0,
-                attempt: prev && prev.attempt && !reconfigured ? prev.attempt : 0,
-                warning: prev ? prev.warning === true && !reconfigured : false,
+                attempt: prev && prev.attempt ? prev.attempt : 0,
+                warning: prev ? prev.warning === true : false,
                 notifiedOk: prev && prev.notifiedOk !== undefined ? prev.notifiedOk : (prev ? prev.ok : null),
                 retryDue: unchanged && live.retryDue ? live.retryDue : 0,
                 checking: unchanged ? live.checking : false,
@@ -181,7 +181,8 @@ Item {
                 lastChecked: _runtime[key].lastChecked,
                 attempt: _runtime[key].attempt,
                 warning: _runtime[key].warning,
-                notifiedOk: _runtime[key].notifiedOk
+                notifiedOk: _runtime[key].notifiedOk,
+                sig: _runtime[key].sig
             };
         }
         PluginService.savePluginState(pluginId, "status", out);
