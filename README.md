@@ -42,7 +42,10 @@ bar section under **Settings → Dank Bar**.
 | Label      | shown in notifications and the popout | —       |
 | URL        | what to request                       | —       |
 | Method     | GET, HEAD, POST, PUT, DELETE          | GET     |
-| Expect     | the HTTP status that means healthy    | 200     |
+| Expect     | the HTTP status that means healthy    | 2xx     |
+
+**Expect** takes one code, a class with `x` wildcards (`2xx`, `20x`), or a comma-separated mix of
+both — e.g. `200, 204` or `2xx, 301`.
 
 **Test** runs the check immediately using the values currently in the card — including unsaved
 ones — and reports `HTTP 200 · 143 ms` or `HTTP 500, expected 200` inline.

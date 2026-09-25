@@ -265,6 +265,8 @@ PluginSettings {
                     property bool testOk: false
                     property bool testing: false
                     property bool alive: true
+                    property bool expectFocused: false
+                    readonly property bool expectInvalid: !expectFocused && !UptimeService.expectPattern.test(expectField.text)
 
                     Component.onDestruction: alive = false
 
@@ -286,7 +288,7 @@ PluginSettings {
                         }
                         card.testing = true;
                         card.testResult = "";
-                        const wanted = parseInt(expectField.text) || UptimeService.defaults.expect;
+                        const wanted = UptimeService.normalizeExpect(expectField.text);
                         const timeout = UptimeService.timeoutSec;
                         Proc.runCommand(`${UptimeService.pluginId}:test:${card.tid}`, UptimeService.curlCommand(target, methodDropdown.currentValue, timeout, headersField.text, bodyField.text), (stdout, exitCode) => {
                             if (!card || !card.alive)
@@ -384,11 +386,11 @@ PluginSettings {
                                 width: optionsRow.fieldWidth
                                 placeholderText: "Expect"
                                 text: card.expect
-                                validator: IntValidator {
-                                    bottom: 100
-                                    top: 599
+                                validator: RegularExpressionValidator {
+                                    regularExpression: UptimeService.expectPattern
                                 }
-                                onEditingFinished: targetsEditor.update(card.index, "expect", text)
+                                onFocusStateChanged: hasFocus => card.expectFocused = hasFocus
+                                onEditingFinished: targetsEditor.update(card.index, "expect", UptimeService.normalizeExpect(text))
                             }
 
                             DankActionButton {
@@ -407,6 +409,15 @@ PluginSettings {
                                 iconName: "play_arrow"
                                 onClicked: card.runTest()
                             }
+                        }
+
+                        StyledText {
+                            width: parent.width
+                            visible: card.expectInvalid
+                            text: "Expect not saved — use status codes or classes like 200, 204 or 2xx (still using " + card.expect + ")"
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.error
+                            wrapMode: Text.WordWrap
                         }
 
                         Column {
@@ -466,7 +477,7 @@ PluginSettings {
                         label: "",
                         url: "",
                         method: UptimeService.defaults.method,
-                        expect: String(UptimeService.defaults.expect),
+                        expect: UptimeService.defaults.expect,
                         headers: "",
                         body: ""
                     });

@@ -12,7 +12,7 @@ Item {
 
     readonly property var defaults: ({
             period: 60,
-            expect: 200,
+            expect: "2xx",
             method: "GET",
             timeoutSec: 15,
             notifyOnRecovery: true,
@@ -77,7 +77,7 @@ Item {
     property double _pendingSince: 0
 
     function _normalize(raw, index) {
-        const expect = parseInt(raw.expect) || defaults.expect;
+        const expect = normalizeExpect(raw.expect);
         const method = String(raw.method || defaults.method).toUpperCase();
         const url = String(raw.url || "").trim();
         return {
@@ -208,13 +208,21 @@ Item {
         return base.concat(verb).concat(parseHeaders(headers)).concat(data).concat(["--url", url]);
     }
 
+    readonly property var expectPattern: /^\s*[1-5][0-9xX]{2}(\s*,\s*[1-5][0-9xX]{2})*\s*$/
+
+    function normalizeExpect(value) {
+        const codes = String(value || "").toLowerCase().split(",").map(p => p.trim()).filter(p => /^[1-5][0-9x]{2}$/.test(p));
+        return codes.length > 0 ? codes.join(", ") : defaults.expect;
+    }
+
     function parseResult(stdout, exitCode, expect) {
         const parts = String(stdout).trim().split(/\s+/);
         const code = parts[0] || "000";
+        const matches = expect.split(", ").some(p => new RegExp("^" + p.replace(/x/g, "\\d") + "$").test(code));
         return {
             code: code,
             timeMs: Math.round((parseFloat(parts[1]) || 0) * 1000),
-            ok: exitCode === 0 && parseInt(code) === expect
+            ok: exitCode === 0 && matches
         };
     }
 
