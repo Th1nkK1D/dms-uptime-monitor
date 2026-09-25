@@ -41,7 +41,7 @@ PluginComponent {
             return Theme.error;
         if (result.warning)
             return Theme.warning;
-        if (result.ok === null || result.ok === undefined)
+        if (result.ok === null)
             return Theme.outlineButton;
         return Theme.success;
     }
@@ -73,7 +73,13 @@ PluginComponent {
         return parts.join(" ");
     }
 
-    Component.onCompleted: UptimeService.targets
+    component FailCount: StyledText {
+        visible: UptimeService.failCount > 0 && !UptimeService.offline
+        text: String(UptimeService.failCount)
+        font.pixelSize: Theme.fontSizeSmall
+        font.weight: Font.Normal
+        color: Theme.error
+    }
 
     component StatusIcon: Item {
         implicitWidth: root.iconSize
@@ -108,13 +114,8 @@ PluginComponent {
             anchors.verticalCenter: parent.verticalCenter
         }
 
-        StyledText {
+        FailCount {
             anchors.verticalCenter: parent.verticalCenter
-            visible: UptimeService.failCount > 0 && !UptimeService.offline
-            text: String(UptimeService.failCount)
-            font.pixelSize: Theme.fontSizeSmall
-            font.weight: Font.Normal
-            color: Theme.error
         }
     }
 
@@ -125,13 +126,8 @@ PluginComponent {
             anchors.horizontalCenter: parent.horizontalCenter
         }
 
-        StyledText {
+        FailCount {
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: UptimeService.failCount > 0 && !UptimeService.offline
-            text: String(UptimeService.failCount)
-            font.pixelSize: Theme.fontSizeSmall
-            font.weight: Font.Normal
-            color: Theme.error
         }
     }
 

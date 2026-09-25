@@ -162,8 +162,8 @@ PluginSettings {
                     tid: String(t.id || nextId()),
                     label: String(t.label || ""),
                     url: String(t.url || ""),
-                    method: String(t.method || "GET"),
-                    expect: String(t.expect || "200"),
+                    method: String(t.method || UptimeService.defaults.method),
+                    expect: String(t.expect || UptimeService.defaults.expect),
                     headers: String(t.headers || ""),
                     body: String(t.body || "")
                 });
@@ -286,22 +286,15 @@ PluginSettings {
                         }
                         card.testing = true;
                         card.testResult = "";
-                        const wanted = parseInt(expectField.text) || 200;
+                        const wanted = parseInt(expectField.text) || UptimeService.defaults.expect;
                         const timeout = UptimeService.timeoutSec;
                         Proc.runCommand(`${UptimeService.pluginId}:test:${card.tid}`, UptimeService.curlCommand(target, methodDropdown.currentValue, timeout, headersField.text, bodyField.text), (stdout, exitCode) => {
                             if (!card || !card.alive)
                                 return;
                             card.testing = false;
-                            const parts = String(stdout).trim().split(/\s+/);
-                            const code = parts[0] || "000";
-                            const ms = Math.round((parseFloat(parts[1]) || 0) * 1000);
-                            if (exitCode === 0 && parseInt(code) === wanted) {
-                                card.testOk = true;
-                                card.testResult = "HTTP " + code + " · " + ms + " ms";
-                            } else {
-                                card.testOk = false;
-                                card.testResult = UptimeService.describeFailure(code, exitCode) + ", expected " + wanted;
-                            }
+                            const result = UptimeService.parseResult(stdout, exitCode, wanted);
+                            card.testOk = result.ok;
+                            card.testResult = result.ok ? "HTTP " + result.code + " · " + result.timeMs + " ms" : UptimeService.describeFailure(result.code, exitCode) + ", expected " + wanted;
                         }, 0, (timeout + 5) * 1000);
                     }
 
@@ -472,8 +465,8 @@ PluginSettings {
                         tid: targetsEditor.nextId(),
                         label: "",
                         url: "",
-                        method: "GET",
-                        expect: "200",
+                        method: UptimeService.defaults.method,
+                        expect: String(UptimeService.defaults.expect),
                         headers: "",
                         body: ""
                     });
@@ -486,9 +479,9 @@ PluginSettings {
     NumberSetting {
         settingKey: "period"
         label: "Check interval"
-        description: "Seconds between checks, shared by every endpoint (minimum 5)"
-        defaultValue: 60
-        minimum: 5
+        description: "Seconds between checks, shared by every endpoint (minimum " + UptimeService.defaults.minPeriod + ")"
+        defaultValue: UptimeService.defaults.period
+        minimum: UptimeService.defaults.minPeriod
         maximum: 86400
     }
 
@@ -496,8 +489,8 @@ PluginSettings {
         settingKey: "timeoutSec"
         label: "Request timeout"
         description: "Seconds to wait for a response before giving up"
-        defaultValue: 15
-        minimum: 3
+        defaultValue: UptimeService.defaults.timeoutSec
+        minimum: UptimeService.defaults.minTimeoutSec
         maximum: 300
     }
 
@@ -505,7 +498,7 @@ PluginSettings {
         settingKey: "retryCount"
         label: "Retries before down"
         description: "Extra attempts after a failed check before the endpoint is declared down and notified (0 disables retrying)"
-        defaultValue: 2
+        defaultValue: UptimeService.defaults.retryCount
         minimum: 0
         maximum: 10
     }
@@ -514,7 +507,7 @@ PluginSettings {
         settingKey: "retryDelaySec"
         label: "Retry delay"
         description: "Seconds to wait between retries while an endpoint is in the warning state"
-        defaultValue: 10
+        defaultValue: UptimeService.defaults.retryDelaySec
         minimum: 1
         maximum: 3600
     }
@@ -523,7 +516,7 @@ PluginSettings {
         settingKey: "settleSec"
         label: "Reconnect grace period"
         description: "Seconds to wait before checking again after the network comes back or the machine wakes from suspend (0 disables the delay)"
-        defaultValue: 10
+        defaultValue: UptimeService.defaults.settleSec
         minimum: 0
         maximum: 600
     }
@@ -546,6 +539,6 @@ PluginSettings {
         settingKey: "notifyOnRecovery"
         label: "Notify on recovery"
         description: "Also send a notification when a failing endpoint comes back up"
-        defaultValue: true
+        defaultValue: UptimeService.defaults.notifyOnRecovery
     }
 }

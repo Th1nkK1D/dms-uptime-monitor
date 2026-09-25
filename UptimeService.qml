@@ -17,6 +17,7 @@ Item {
             timeoutSec: 15,
             notifyOnRecovery: true,
             minPeriod: 5,
+            minTimeoutSec: 3,
             retryCount: 2,
             retryDelaySec: 10,
             settleSec: 10
@@ -93,7 +94,7 @@ Item {
     function loadSettings() {
         const raw = PluginService.loadPluginData(pluginId, "targets", []) || [];
         notifyOnRecovery = PluginService.loadPluginData(pluginId, "notifyOnRecovery", defaults.notifyOnRecovery);
-        timeoutSec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "timeoutSec", defaults.timeoutSec)) || defaults.timeoutSec);
+        timeoutSec = Math.max(defaults.minTimeoutSec, parseInt(PluginService.loadPluginData(pluginId, "timeoutSec", defaults.timeoutSec)) || defaults.timeoutSec);
         period = Math.max(defaults.minPeriod, parseInt(PluginService.loadPluginData(pluginId, "period", defaults.period)) || defaults.period);
         retryCount = Math.max(0, parseInt(PluginService.loadPluginData(pluginId, "retryCount", defaults.retryCount)) || 0);
         retryDelaySec = Math.max(1, parseInt(PluginService.loadPluginData(pluginId, "retryDelaySec", defaults.retryDelaySec)) || defaults.retryDelaySec);
@@ -206,6 +207,16 @@ Item {
         return base.concat(verb).concat(parseHeaders(headers)).concat(data).concat(["--url", url]);
     }
 
+    function parseResult(stdout, exitCode, expect) {
+        const parts = String(stdout).trim().split(/\s+/);
+        const code = parts[0] || "000";
+        return {
+            code: code,
+            timeMs: Math.round((parseFloat(parts[1]) || 0) * 1000),
+            ok: exitCode === 0 && parseInt(code) === expect
+        };
+    }
+
     function _findTarget(key) {
         for (var i = 0; i < targets.length; i++) {
             if (targets[i].key === key)
@@ -275,13 +286,11 @@ Item {
 
         state.checking = false;
 
-        const parts = String(stdout).trim().split(/\s+/);
-        const code = parts[0] || "000";
-        const timeMs = Math.round((parseFloat(parts[1]) || 0) * 1000);
-        const ok = exitCode === 0 && parseInt(code) === t.expect;
+        const result = parseResult(stdout, exitCode, t.expect);
+        const ok = result.ok;
 
-        state.code = code;
-        state.timeMs = timeMs;
+        state.code = result.code;
+        state.timeMs = result.timeMs;
         state.exitCode = exitCode;
         state.lastChecked = Date.now();
 
