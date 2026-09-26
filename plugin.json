@@ -2,7 +2,7 @@
   "id": "uptimeMonitor",
   "name": "Uptime Monitor",
   "description": "Periodically checks URLs and alerts on unexpected HTTP status",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": "Th1nkK1D",
   "icon": "cell_tower",
   "type": "widget",
