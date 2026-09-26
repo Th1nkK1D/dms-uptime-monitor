@@ -3,6 +3,8 @@
 A [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) bar plugin that polls
 your URLs on a schedule and tells you when one stops answering the way it should.
 
+![Uptime Monitor popout on the Dank Bar](screenshot.png)
+
 The bar shows a signal-tower icon with a status dot:
 
 | Dot         | Meaning                                        |
@@ -25,13 +27,24 @@ optional one when it recovers, saying how long it was down.
 
 ## Install
 
+In DMS: **Settings → Plugins → Browse**, search for _Uptime Monitor_ and install it — or from a
+terminal:
+
+```bash
+dms plugins install uptimeMonitor
+```
+
+Then enable _Uptime Monitor_ under **Settings → Plugins** and add it to a bar section under
+**Settings → Dank Bar**.
+
+To run it from source instead:
+
 ```bash
 git clone https://github.com/Th1nkK1D/dms-uptime-monitor.git
 ln -s "$PWD/dms-uptime-monitor" ~/.config/DankMaterialShell/plugins/uptimeMonitor
 ```
 
-Then in DMS: **Settings → Plugins → Scan for Plugins**, enable _Uptime Monitor_, and add it to a
-bar section under **Settings → Dank Bar**.
+and use **Settings → Plugins → Scan for Plugins** to pick it up.
 
 ## Configure
 
