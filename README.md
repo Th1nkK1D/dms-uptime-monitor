@@ -16,14 +16,13 @@ The bar shows a signal-tower icon with a status dot:
 | grey        | offline — no network, or every target unreachable at once |
 
 A failed check does not mean down yet: the target turns yellow and is retried a configured number
-of times first. A critical desktop notification fires only once those retries are exhausted, and an
+of times first. A desktop notification fires only once those retries are exhausted, and an
 optional one when it recovers, saying how long it was down.
 
 ## Requirements
 
-- DankMaterialShell >= 1.5.0
+- DankMaterialShell >= 1.6.0
 - `curl`
-- `notify-send` (libnotify)
 
 ## Install
 

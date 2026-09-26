@@ -457,7 +457,8 @@ Item {
         const title = recovered ? (t.label + " is back up") : (t.label + " is down");
         const downFor = state.downtimeMs > 0 ? " after " + formatDuration(state.downtimeMs) + " down" : "";
         const body = recovered ? (t.url + " — HTTP " + state.code + downFor) : (t.url + " — " + describeFailure(state.code, state.exitCode) + ", expected " + t.expect);
-        Quickshell.execDetached(["notify-send", "-a", "Uptime Monitor", "-u", recovered ? "normal" : "critical", title, body]);
+        // "--" so a label starting with "-" isn't parsed as a dms flag.
+        Quickshell.execDetached(["dms", "notify", "--app", "Uptime Monitor", "--", title, body]);
     }
 
     onLinkDownChanged: {

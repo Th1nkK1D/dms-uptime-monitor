@@ -16,7 +16,7 @@ desktop notification on unexpected HTTP status.
     on completion). Timeout fires the callback with exit code 124 and kills the process.
   - Widgets: `Widgets/{DankIcon,StyledText,DankTextField,DankButton,DankDropdown,...}.qml`
 - Reference plugins: `~/.config/DankMaterialShell/plugins/dockerManager` (Singleton service + popout),
-  `.repos/*/DankBatteryAlerts` (notify-send), `.repos/*/DankGifSearch` (curl via Proc).
+  `.repos/*/DankGifSearch` (curl via Proc).
 - Plugin settings are stored in `~/.config/DankMaterialShell/plugin_settings.json[pluginId]`;
   runtime state in `~/.local/state/DankMaterialShell/plugins/<pluginId>_state.json`.
 - DMS runs as `systemctl --user dms.service`; logs: `journalctl --user -fu dms`.
@@ -44,7 +44,9 @@ First time: Settings → Plugins → Scan for Plugins → enable → add "Uptime
 - HTTP via `curl -s -o /dev/null -w '%{http_code}' -X METHOD --connect-timeout 5 --max-time 15 --url URL`
   (no `-L`: expecting a 3xx must be possible; `--url` so a leading `-` isn't read as an option)
   (no XMLHttpRequest — matches ecosystem). Exit≠0 / code `000` = DOWN.
-- Notifications: `Quickshell.execDetached(["notify-send","-a","Uptime Monitor","-u","critical",title,body])`.
+- Notifications: `Quickshell.execDetached(["dms","notify","--app","Uptime Monitor","--",title,body])` (DMS >= 1.6;
+  no notify-send dependency). `dms notify` has no urgency flag and ignores `--timeout 0`, so alerts are normal
+  5 s notifications, not persistent critical ones.
 - Poller lives in Singleton `UptimeService.qml` (registered in `qmldir`); widgets read it and call its
   actions (`checkAll`, `check`, `setPaused`). `results` is active endpoints only (drives the bar and
   offline detection); `displayResults` adds paused ones, in settings order, for the popout.

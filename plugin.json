@@ -9,7 +9,7 @@
   "capabilities": ["dankbar-widget"],
   "component": "./UptimeWidget.qml",
   "settings": "./UptimeSettings.qml",
-  "requires_dms": ">=1.5.0",
-  "requires": ["curl", "notify-send"],
+  "requires_dms": ">=1.6.0",
+  "requires": ["curl"],
   "permissions": ["settings_read", "settings_write", "process", "network"]
 }
