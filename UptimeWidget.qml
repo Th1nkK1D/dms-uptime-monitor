@@ -305,7 +305,7 @@ PluginComponent {
                                         anchors.top: parent.top
                                         anchors.topMargin: Math.round((labelText.height - height) / 2)
                                         name: endpointRow.expanded ? "expand_less" : "expand_more"
-                                        size: 18
+                                        size: Theme.iconSizeSmall
                                         color: Theme.surfaceVariantText
                                     }
                                 }

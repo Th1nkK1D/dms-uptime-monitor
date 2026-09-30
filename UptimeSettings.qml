@@ -35,7 +35,7 @@ PluginSettings {
         }
 
         function loadValue() {
-            // every child reloads whenever any other setting saves
+            // PluginSettings reloads every field whenever any setting saves; don't clobber text being typed.
             if (field.activeFocus)
                 return;
             const settings = findSettings();

@@ -157,6 +157,7 @@ Item {
             nextDue = now + period * 1000;
         _publish();
         _persist();
+        _schedule();
     }
 
     function _publish() {
@@ -286,10 +287,11 @@ Item {
             else
                 check(key);
         }
+        _schedule();
     }
 
     // A check that was in flight across a link drop or a suspend measured the outage,
-    // not the endpoint. Bumping runId makes _onResult discard the late callback.
+    // not the endpoint.
     function _clearPending() {
         for (var key in _runtime) {
             const state = _runtime[key];
@@ -312,7 +314,6 @@ Item {
         const state = _runtime[key];
         if (!t || !state || state.runId !== runId)
             return;
-
         state.checking = false;
 
         const result = parseResult(stdout, exitCode, t.expect);
@@ -335,6 +336,7 @@ Item {
         _publish();
         _persist();
         _flushNotifications();
+        _schedule();
     }
 
     function _settled() {
@@ -383,7 +385,7 @@ Item {
     // fire one notification per endpoint. Capped, because an endpoint slower than the
     // poll interval must not sit on everyone else's alerts — but the cap is waived while
     // the cycle still looks like an outage, or it would release the very alerts the wait
-    // exists to suppress. Every check ends within its timeout, so that wait is bounded.
+    // exists to suppress.
     function _flushNotifications() {
         if (linkDown || targets.length === 0)
             return;
@@ -461,29 +463,58 @@ Item {
         Quickshell.execDetached(["dms", "notify", "--app", "Uptime Monitor", "--", title, body]);
     }
 
-    onLinkDownChanged: {
+    // After a suspend the link is up on paper but wifi is still reassociating,
+    // so give it the same grace as a reconnect.
+    function _onResume() {
         _clearPending();
-        if (!linkDown)
-            nextDue = Date.now() + settleSec * 1000;
+        nextDue = Date.now() + settleSec * 1000;
+        _schedule();
+    }
+
+    property double _wakeAt: 0
+
+    function _schedule() {
+        if (targets.length === 0 || linkDown) {
+            wakeTimer.stop();
+            return;
+        }
+        const now = Date.now();
+        var at = nextDue;
+        for (var i = 0; i < targets.length; i++) {
+            const s = _runtime[targets[i].key];
+            if (!s || s.checking)
+                continue;
+            if (s.needsCheck)
+                at = now;
+            else if (s.retryDue > 0)
+                at = Math.min(at, s.retryDue);
+        }
+        const cap = _pendingSince + (timeoutSec + 5) * 1000;
+        if (_pendingSince > 0 && cap > now)
+            at = Math.min(at, cap);
+        _wakeAt = Math.max(at, now);
+        wakeTimer.interval = _wakeAt - now;
+        wakeTimer.restart();
+    }
+
+    onLinkDownChanged: {
+        if (linkDown) {
+            _clearPending();
+            _schedule();
+        } else {
+            _onResume();
+        }
     }
 
     Timer {
-        interval: 1000
-        repeat: true
-        running: root.targets.length > 0 && !root.linkDown
-
-        property double lastTick: 0
+        id: wakeTimer
 
         onTriggered: {
             const now = Date.now();
-            const gap = lastTick > 0 ? now - lastTick : 0;
-            lastTick = now;
-
-            // A 1s timer that jumped means the machine was suspended: the link is up on
-            // paper but wifi is still reassociating, so give it the same grace as a reconnect.
-            if (gap > 15000) {
-                root._clearPending();
-                root.nextDue = now + root.settleSec * 1000;
+            // Qt timers run on the monotonic clock, which stops during suspend, so firing
+            // well past _wakeAt in wall time means we slept and sessionResumed didn't fire.
+            if (now - root._wakeAt > 15000) {
+                root._onResume();
                 return;
             }
 
@@ -500,6 +531,14 @@ Item {
                     root.check(key);
             }
             root._flushNotifications();
+            root._schedule();
+        }
+    }
+
+    Connections {
+        target: SessionService
+        function onSessionResumed() {
+            root._onResume();
         }
     }
 
